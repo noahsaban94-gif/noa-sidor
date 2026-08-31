@@ -305,6 +305,10 @@ export default function App() {
               onSendToWebhook={(msg, target) =>
                 handleSendWebhook({ message: msg, target: target || 'make' })
               }
+              onOrderInjectedDirectly={(injectedOrder) => {
+                setOrders((prev) => [injectedOrder, ...prev.filter((o) => o.id !== injectedOrder.id)]);
+                showToast(`הזמנה #${injectedOrder.orderNumber} הוזרקה ישירות לטאב 2 (סידור_עבודה_יומי)!`);
+              }}
               onAddNormalizedOrder={(items, rawText) => {
                 const requiresCrane = items.some((i) => i.unit === 'בלה' || i.name.includes('בלוק'));
                 const newOrderPrefill: Partial<OrderItem> = {

@@ -16,9 +16,13 @@ import {
   Share2,
   CornerDownLeft,
   Building2,
-  Layers
+  Layers,
+  Navigation,
+  Scale,
+  ShieldCheck
 } from 'lucide-react';
 import { OrderItem, OrderStatus, STATUS_MAP, DRIVERS_LIST } from '../types';
+import { calculateOrderMetrics, formatWeight } from '../utils/logistics';
 
 interface OrderCardProps {
   order: OrderItem;
@@ -44,6 +48,10 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   const [tempTime, setTempTime] = useState(order.deliveryTime);
 
   const statusConfig = STATUS_MAP[order.status] || STATUS_MAP.pending;
+  const metrics = calculateOrderMetrics(order.items);
+  const totalWeight = order.totalWeightKg || metrics.totalWeightKg;
+  const warehouse = order.warehouse || metrics.warehouse;
+  const depositDetails = order.depositDetails || metrics.depositDetails;
 
   const handleQuickShiftTime = (minutes: number) => {
     const [h, m] = order.deliveryTime.split(':').map(Number);
@@ -63,6 +71,8 @@ export const OrderCard: React.FC<OrderCardProps> = ({
     }
   };
 
+  const wazeUrl = `https://waze.com/ul?q=${encodeURIComponent(order.destination)}&navigate=yes`;
+
   return (
     <div
       id={`order-card-${order.id}`}
@@ -79,6 +89,12 @@ export const OrderCard: React.FC<OrderCardProps> = ({
             <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30">
               <AlertTriangle className="w-3 h-3 text-amber-400" />
               דורש מנוף
+            </span>
+          )}
+
+          {warehouse && (
+            <span className="text-[11px] text-amber-300 bg-amber-950/30 px-2 py-0.5 rounded border border-amber-500/30 font-medium">
+              {warehouse}
             </span>
           )}
 
@@ -174,35 +190,59 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         </div>
       </div>
 
-      {/* Customer Name */}
-      <div className="mb-2">
-        <h3 className="text-base font-bold text-slate-100 group-hover:text-emerald-300 transition flex items-center gap-2">
-          <User className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-          <span className="truncate">{order.customerName}</span>
-        </h3>
-        {order.customerPhone && (
-          <a
-            href={`tel:${order.customerPhone}`}
-            className="text-xs text-slate-400 hover:text-cyan-400 inline-flex items-center gap-1 mt-0.5"
-          >
-            <Phone className="w-3 h-3 text-cyan-400" />
-            <span className="font-mono">{order.customerPhone}</span>
-          </a>
+      {/* Customer Name & Weight Header */}
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h3 className="text-base font-bold text-slate-100 group-hover:text-emerald-300 transition flex items-center gap-2">
+            <User className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <span className="truncate">{order.customerName}</span>
+          </h3>
+          {order.customerPhone && (
+            <a
+              href={`tel:${order.customerPhone}`}
+              className="text-xs text-slate-400 hover:text-cyan-400 inline-flex items-center gap-1 mt-0.5"
+            >
+              <Phone className="w-3 h-3 text-cyan-400" />
+              <span className="font-mono">{order.customerPhone}</span>
+            </a>
+          )}
+        </div>
+
+        {totalWeight > 0 && (
+          <div className="text-left">
+            <span className="inline-flex items-center gap-1 text-xs font-mono font-bold text-cyan-300 bg-cyan-950/40 px-2 py-0.5 rounded-lg border border-cyan-500/30">
+              <Scale className="w-3 h-3 text-cyan-400" />
+              {formatWeight(totalWeight)}
+            </span>
+          </div>
         )}
       </div>
 
-      {/* Destination / Address */}
-      <div className="flex items-start gap-2 text-xs text-slate-300 bg-black/40 p-2.5 rounded-xl border border-white/[0.06] mb-3">
-        <MapPin className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
-        <div className="min-w-0 flex-1">
-          <p className="font-medium text-slate-200">{order.destination}</p>
-          {order.siteContact && (
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              איש קשר באתר: <span className="text-slate-300 font-medium">{order.siteContact}</span>
-              {order.sitePhone && ` (${order.sitePhone})`}
-            </p>
-          )}
+      {/* Destination / Address with Waze Navigation Link */}
+      <div className="flex items-start justify-between gap-2 text-xs text-slate-300 bg-black/40 p-2.5 rounded-xl border border-white/[0.06] mb-3">
+        <div className="flex items-start gap-2 min-w-0 flex-1">
+          <MapPin className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-slate-200">{order.destination}</p>
+            {order.siteContact && (
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                איש קשר: <span className="text-slate-300 font-medium">{order.siteContact}</span>
+                {order.sitePhone && ` (${order.sitePhone})`}
+              </p>
+            )}
+          </div>
         </div>
+
+        <a
+          href={wazeUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-[11px] font-bold transition active:scale-95 flex-shrink-0"
+          title="פתח ניווט ישיר ב-Waze"
+        >
+          <Navigation className="w-3 h-3 text-cyan-400" />
+          <span>Waze</span>
+        </a>
       </div>
 
       {/* Driver & Delivery Time (Interactive Timeline Controls) */}
@@ -296,6 +336,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({
             <Package className="w-3 h-3 text-emerald-400" />
             פירוט חומרים ({order.items.length}):
           </span>
+          {depositDetails && depositDetails !== 'ללא פקדון' && (
+            <span className="text-[10px] text-amber-300 font-medium">
+              פקדון: {depositDetails}
+            </span>
+          )}
         </div>
 
         <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
@@ -321,7 +366,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         </div>
       )}
 
-      {/* Footer Actions: WhatsApp dispatch */}
+      {/* Footer Actions: WhatsApp dispatch & Time */}
       <div className="flex items-center justify-between pt-2 border-t border-white/[0.08]">
         <span className="text-[10px] text-slate-500 font-mono">
           עודכן: {new Date(order.updatedAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}

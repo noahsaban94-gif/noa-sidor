@@ -13,32 +13,42 @@ import {
   FileSpreadsheet,
   Share2,
   ExternalLink,
-  Bot
+  Bot,
+  MapPin,
+  CheckCircle2,
+  Navigation,
+  Building2,
+  Scale
 } from 'lucide-react';
 import { ChatMessage, OrderItem, CONFIG } from '../types';
+import { calculateOrderMetrics, formatWeight } from '../utils/logistics';
 
 interface NoaChatRoomProps {
   orders: OrderItem[];
   onSendToWebhook: (message: string, target?: 'make' | 'joni') => void;
   onAddNormalizedOrder?: (items: any[], rawText: string) => void;
+  onOrderInjectedDirectly?: (order: OrderItem) => void;
 }
 
 export const NoaChatRoom: React.FC<NoaChatRoomProps> = ({
   orders,
   onSendToWebhook,
   onAddNormalizedOrder,
+  onOrderInjectedDirectly,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'msg-1',
       sender: 'noa',
-      text: 'שלום! אני נועה, מנהלת הסידור, השילוח ונרמול ההזמנות שלכם. 🚛✨\nאיך אפשר לעזור היום? אני יכולה לנרמל הזמנות בטקסט חופשי לפי "מילון לוגיסטי", לעדכן על מצב הנהגים (חכמת במנוף ועלי), להזיז שעות בסידור, או לייצר עבורך דוח בוקר וסיכום יומי לוורד ולצוות.',
+      text: 'שלום! אני נועה, מנהלת הסידור, השילוח ונרמול ההזמנות שלכם. 🚛✨\nאיך אפשר לעזור היום? אני יכולה לפענח הזמנות בטקסט חופשי לפי "מילון לוגיסטי" ולהזריק אותן מיידית לטאב 2 ב-Google Sheets, לעדכן לו״ז של חכמת ועלי, להפיק דוח בוקר וסיכום יומי לוורד.',
       timestamp: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
       status: 'read',
     },
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isInjecting, setIsInjecting] = useState<string | null>(null);
+  const [injectedOrders, setInjectedOrders] = useState<{ [msgId: string]: OrderItem }>({});
   const [lastWebhookSent, setLastWebhookSent] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -101,6 +111,65 @@ export const NoaChatRoom: React.FC<NoaChatRoomProps> = ({
     }
   };
 
+  // Direct 1-click injection to Tab 2 (סידור_עבודה_יומי) via /api/gas/insert-order
+  const handleDirectInject = async (msgId: string, items: any[], rawText: string) => {
+    setIsInjecting(msgId);
+    try {
+      // Determine destination & customer from text
+      const dest = rawText.includes('רעננה')
+        ? 'רעננה, אחוזה 140'
+        : rawText.includes('הרצליה')
+        ? 'הרצליה פיתוח, הנשיא 22'
+        : rawText.includes('הוד השרון')
+        ? 'הוד השרון, שושנת הכרמל 4'
+        : rawText.includes('תל אביב')
+        ? 'תל אביב, דיזנגוף 88'
+        : 'אתר בניה - מרכז';
+
+      const metrics = calculateOrderMetrics(
+        items.map((i) => ({ sku: i.sku, name: i.name, quantity: i.quantity || 1, unit: i.unit || 'יח\'' }))
+      );
+
+      const driver = metrics.hasCraneItem ? 'חכמת (מנוף)' : 'עלי (משאית רגילה)';
+
+      const payload = {
+        orderNumber: `SN-${Math.floor(1000 + Math.random() * 9000)}`,
+        customerName: rawText.includes('יוסי') ? 'יוסי כהן' : rawText.includes('אבי') ? 'אבי שיפוצים' : 'לקוח נועה AI',
+        destination: dest,
+        deliveryTime: '10:30',
+        driver,
+        craneRequired: metrics.hasCraneItem,
+        warehouse: metrics.warehouse,
+        items: items.map((it) => ({
+          sku: it.sku,
+          name: it.name,
+          quantity: it.quantity || 1,
+          unit: it.unit || 'יח\'',
+        })),
+        notes: `שובץ אוטומטית ע"י נועה AI מטקסט: "${rawText}" | פקדון: ${metrics.depositDetails}`,
+        status: 'pending',
+      };
+
+      const res = await fetch('/api/gas/insert-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (data.success && data.order) {
+        setInjectedOrders((prev) => ({ ...prev, [msgId]: data.order }));
+        if (onOrderInjectedDirectly) {
+          onOrderInjectedDirectly(data.order);
+        }
+      }
+    } catch (err) {
+      console.error('Direct injection error:', err);
+    } finally {
+      setIsInjecting(null);
+    }
+  };
+
   const handleSendToWhatsAppWebhook = async (text: string, target: 'make' | 'joni' = 'make') => {
     onSendToWebhook(text, target);
     setLastWebhookSent(text);
@@ -134,12 +203,12 @@ export const NoaChatRoom: React.FC<NoaChatRoomProps> = ({
             <div className="flex items-center gap-2">
               <h2 className="font-bold text-sm text-slate-100">נועה AI - סידור ולוגיסטיקה</h2>
               <span className="text-[10px] bg-emerald-500/15 text-emerald-300 font-mono px-2 py-0.5 rounded-full border border-emerald-500/30">
-                JONI & Make Webhook
+                Google Sheets & Webhooks
               </span>
             </div>
             <p className="text-xs text-emerald-400 font-medium flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              מחוברת אונליין • מענה מבוסס AI
+              מחוברת אונליין • פענוח שפה חופשית והזרקה לטאב 2
             </p>
           </div>
         </div>
@@ -168,16 +237,18 @@ export const NoaChatRoom: React.FC<NoaChatRoomProps> = ({
         {/* Date Marker */}
         <div className="text-center my-2">
           <span className="bg-white/[0.04] text-slate-400 text-[11px] font-medium px-3 py-1 rounded-full border border-white/[0.08] shadow-sm backdrop-blur-md">
-            היום • סידור עבודה חי
+            היום • סידור עבודה חי בזמן אמת
           </span>
         </div>
 
         {messages.map((msg) => {
           const isUser = msg.sender === 'user';
+          const injectedOrder = injectedOrders[msg.id];
+
           return (
             <div
               key={msg.id}
-              className={`flex flex-col ${isUser ? 'items-start' : 'items-end'} max-w-[88%] sm:max-w-[78%] ${
+              className={`flex flex-col ${isUser ? 'items-start' : 'items-end'} max-w-[90%] sm:max-w-[80%] ${
                 isUser ? 'mr-auto' : 'ml-auto'
               }`}
             >
@@ -199,32 +270,68 @@ export const NoaChatRoom: React.FC<NoaChatRoomProps> = ({
 
                 {/* Normalized Items Card if present */}
                 {msg.normalizedItems && msg.normalizedItems.length > 0 && (
-                  <div className="mt-3 p-3 rounded-xl bg-black/40 border border-emerald-500/30 text-xs space-y-2">
+                  <div className="mt-3 p-3 rounded-xl bg-black/50 border border-emerald-500/30 text-xs space-y-2.5">
                     <div className="flex items-center justify-between text-emerald-400 font-bold border-b border-white/10 pb-1.5">
                       <span className="flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5" />
-                        <span>נרמול מילון לוגיסטי ({msg.normalizedItems.length} פריטים)</span>
+                        <span>נרמול מילון לוגיסטי ({msg.normalizedItems.length} פריטים שפוענחו)</span>
                       </span>
-                      <span className="text-[10px] text-slate-400">SKU זוהה</span>
+                      <span className="text-[10px] text-cyan-300 font-mono">טאב 1 זוהה</span>
                     </div>
 
                     <div className="space-y-1.5">
                       {msg.normalizedItems.map((item, i) => (
-                        <div key={i} className="flex items-center justify-between text-slate-200 text-[11px]">
+                        <div key={i} className="flex items-center justify-between text-slate-200 text-[11px] bg-white/[0.02] p-1.5 rounded border border-white/5">
                           <span className="font-mono text-cyan-300">[{item.sku}] {item.name}</span>
                           <span className="font-bold text-emerald-300">{item.quantity} {item.unit}</span>
                         </div>
                       ))}
                     </div>
 
-                    {onAddNormalizedOrder && (
+                    {/* Single-Click Instant Injection Button to Tab 2 */}
+                    {!injectedOrder ? (
                       <button
-                        onClick={() => onAddNormalizedOrder(msg.normalizedItems || [], msg.rawText || '')}
-                        className="w-full mt-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950/60 transition active:scale-95"
+                        onClick={() => handleDirectInject(msg.id, msg.normalizedItems || [], msg.rawText || '')}
+                        disabled={isInjecting === msg.id}
+                        className="w-full mt-2 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/60 transition active:scale-95 disabled:opacity-50"
                       >
-                        <Truck className="w-3.5 h-3.5" />
-                        <span>הזן ישירות כהזמנה חדשה בסידור</span>
+                        <Truck className="w-4 h-4" />
+                        <span>
+                          {isInjecting === msg.id
+                            ? 'מזריק כעת לטאב 2 (סידור_עבודה_יומי)...'
+                            : '⚡ אשר והזרק מיידית לסידור עבודה (טאב 2)'}
+                        </span>
                       </button>
+                    ) : (
+                      <div className="mt-2 p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/50 space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold text-emerald-300">
+                          <span className="flex items-center gap-1.5">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            <span>ההזמנה שובצה בהצלחה בסידור!</span>
+                          </span>
+                          <span className="font-mono text-cyan-300">#{injectedOrder.orderNumber}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-1">
+                          <a
+                            href={`https://waze.com/ul?q=${encodeURIComponent(injectedOrder.destination)}&navigate=yes`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex-1 py-1.5 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 text-[11px] font-bold flex items-center justify-center gap-1.5 transition"
+                          >
+                            <Navigation className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>נווט ב-Waze</span>
+                          </a>
+
+                          <button
+                            onClick={() => handleSendToWhatsAppWebhook(`🚚 הזמנה #${injectedOrder.orderNumber} שובצה בהצלחה ל${injectedOrder.driver} ביעד ${injectedOrder.destination}`)}
+                            className="flex-1 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold flex items-center justify-center gap-1.5 transition"
+                          >
+                            <Send className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>שדר לוורד</span>
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}
@@ -316,7 +423,7 @@ export const NoaChatRoom: React.FC<NoaChatRoomProps> = ({
       >
         <input
           type="text"
-          placeholder="הקלד הודעה לנועה AI (לדוגמה: מתי חכמת מגיע להרצליה?)..."
+          placeholder="הקלד הודעה לנועה AI (לדוגמה: תביא 20 מלט ו-3 בלות חול להרצליה)..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
           className="flex-1 bg-black/50 border border-white/10 focus:border-emerald-500 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none transition"

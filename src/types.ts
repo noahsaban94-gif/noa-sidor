@@ -29,6 +29,9 @@ export interface OrderItem {
   floor?: string;
   siteContact?: string;
   sitePhone?: string;
+  warehouse?: string; // מחסן מקור (🏭 4️⃣(החרש) / 🏟️ 1️⃣(התלמיד))
+  totalWeightKg?: number;
+  depositDetails?: string;
   deliveryNotePdf?: string; // תעודת משלוח PDF
   customerSignature?: string; // חתימת לקוח
   syncStatus?: boolean; // סנכרון תעודה

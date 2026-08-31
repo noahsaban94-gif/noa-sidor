@@ -12,6 +12,19 @@ export const DRIVERS_LIST = [
   'משאית 09',
 ];
 
+export const CORE_LOGISTICS_ITEMS = [
+  { sku: '10002', name: 'מלט אפור 25 ק"ג', category: 'חומרי מליטה', unit: 'שק', keywords: 'מלט נשר, מלט אפור, שק מלט', warehouse: '🏭 4️⃣(החרש)', defaultDriver: 'חכמת / עלי' },
+  { sku: '11501', name: 'חול שק גדול (בלה)', category: 'עפר חול וחצץ', unit: 'שק גד', keywords: 'בלה חול, חול בלה, חול ים, שק גדול', warehouse: '🏭 4️⃣(החרש)', defaultDriver: 'חכמת (מנוף)' },
+  { sku: '11550', name: 'טיט מוכן שק', category: 'עפר חול וחצץ', unit: 'שק', keywords: 'טיט, טיט מוכן, שק טיט, טיט לבניה', warehouse: '🏭 4️⃣(החרש)', defaultDriver: 'חכמת / עלי' },
+  { sku: '14075', name: 'טיח גבס MP75 שק 25 ק"ג', category: 'טיח ודבקים', unit: 'שק', keywords: 'MP75, אמפי 75, טיח גבס, טיח מכונה', warehouse: '🏭 4️⃣(החרש)', defaultDriver: 'עלי (משאית רגילה)' },
+  { sku: '111260', name: 'לוח גבס לבן 260 ע 12.50', category: 'לוחות גבס', unit: 'לוח', keywords: 'גבס לבן 2.60, לוח לבן, גבס סטנדרטי', warehouse: '🏟️ 1️⃣(התלמיד)', defaultDriver: 'עלי (פתוחה)' },
+  { sku: '112260', name: 'לוח גבס ירוק 260 ע 12.50', category: 'לוחות גבס', unit: 'לוח', keywords: 'גבס ירוק, עמיד מים, גבס רטוב', warehouse: '🏟️ 1️⃣(התלמיד)', defaultDriver: 'עלי (פתוחה)' },
+  { sku: '9550300', name: 'ניצב 0.5 50/300', category: 'פרופילים וגבס', unit: 'יח\'', keywords: 'ניצב 50, ניצב 3 מטר, ניצב גבס', warehouse: '🏟️ 1️⃣(התלמיד)', defaultDriver: 'עלי (פתוחה)' },
+  { sku: '8550300', name: 'מסלול 0.5 50/300', category: 'פרופילים וגבס', unit: 'יח\'', keywords: 'מסלול 50, מסלול 3 מטר, מסלול גבס', warehouse: '🏟️ 1️⃣(התלמיד)', defaultDriver: 'עלי (פתוחה)' },
+  { sku: '31413', name: 'בורג פחפח ראש שטוח 4.2*13', category: 'ברגים ופרזול', unit: 'קופסא', keywords: 'בורג פחפח, פח פח 13, ברגים לפח', warehouse: '🏟️ 1️⃣(התלמיד)', defaultDriver: 'עלי' },
+  { sku: '41544', name: 'להבים לסכין יפני רחב', category: 'כלי עבודה', unit: 'יח\'', keywords: 'להב, סכין יפני, להבים, חבילת להבים', warehouse: '🏟️ 1️⃣(התלמיד)', defaultDriver: 'עלי' },
+];
+
 export const INITIAL_ORDERS: OrderItem[] = [
   {
     id: 'ord-6215184',
@@ -26,6 +39,9 @@ export const INITIAL_ORDERS: OrderItem[] = [
     floor: 'קומה 3 למרפסת',
     siteContact: 'אחמד מנהל עבודה',
     sitePhone: '054-9988112',
+    warehouse: '🏭 4️⃣(החרש)',
+    totalWeightKg: 6875,
+    depositDetails: '5 שקי בלה (60002) + משטח סבן',
     deliveryNotePdf: 'https://docs.google.com/viewer?url=https://saban.co.il/docs/delivery_6215184.pdf',
     customerSignature: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="40"><path d="M10 25 Q 30 5, 50 25 T 90 20" stroke="%2310b981" stroke-width="3" fill="none"/></svg>',
     syncStatus: true,
@@ -53,11 +69,14 @@ export const INITIAL_ORDERS: OrderItem[] = [
     floor: 'קרקע - חצר אחורית',
     siteContact: 'דני מפקח',
     sitePhone: '050-3344557',
+    warehouse: '🏟️ 1️⃣(התלמיד)',
+    totalWeightKg: 1085,
+    depositDetails: 'ללא פקדון',
     deliveryNotePdf: 'https://docs.google.com/viewer?url=https://saban.co.il/docs/delivery_6215185.pdf',
     customerSignature: '',
     syncStatus: false,
     items: [
-      { sku: '111260', name: 'לוח גבס לבן 260 ע 12.50', quantity: 45, unit: 'יח\'' },
+      { sku: '111260', name: 'לוח גבס לבן 260 ע 12.50', quantity: 45, unit: 'לוח' },
       { sku: '41544', name: 'להבים לסכין יפני רחב', quantity: 10, unit: 'יח\'' },
       { sku: '15453', name: 'סופר 7 שקוף 290ML', quantity: 6, unit: 'יח\'' }
     ],
@@ -79,11 +98,14 @@ export const INITIAL_ORDERS: OrderItem[] = [
     floor: 'גג קומה 2',
     siteContact: 'אלון',
     sitePhone: '053-4411223',
+    warehouse: '🏭 4️⃣(החרש)',
+    totalWeightKg: 3150,
+    depositDetails: '2 משטחי בלוקים + משטח סבן',
     deliveryNotePdf: 'https://docs.google.com/viewer?url=https://saban.co.il/docs/delivery_6215186.pdf',
     customerSignature: '',
     syncStatus: false,
     items: [
-      { sku: '12204', name: 'בלוק בטון 20/20/40 4 חורים', quantity: 2, unit: 'יח\'' },
+      { sku: '12204', name: 'בלוק בטון 20/20/40 4 חורים', quantity: 2, unit: 'משטח' },
       { sku: '10002', name: 'מלט אפור 25 ק"ג', quantity: 30, unit: 'שק' },
       { sku: '15770', name: 'טיח ממ"ד רב תכליתי 25 ק"ג', quantity: 4, unit: 'שק' }
     ],
@@ -105,6 +127,9 @@ export const INITIAL_ORDERS: OrderItem[] = [
     floor: 'מרתף חניון מינוס 1',
     siteContact: 'ולדימיר',
     sitePhone: '054-6655444',
+    warehouse: '🏟️ 1️⃣(התלמיד)',
+    totalWeightKg: 257,
+    depositDetails: 'ללא פקדון',
     deliveryNotePdf: 'https://docs.google.com/viewer?url=https://saban.co.il/docs/delivery_6215187.pdf',
     customerSignature: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="40"><path d="M15 30 C 35 10, 60 40, 85 15" stroke="%2338bdf8" stroke-width="3" fill="none"/></svg>',
     syncStatus: true,
@@ -131,6 +156,9 @@ export const INITIAL_ORDERS: OrderItem[] = [
     floor: 'קומה 1',
     siteContact: 'אבי',
     sitePhone: '052-1122334',
+    warehouse: '🏭 4️⃣(החרש)',
+    totalWeightKg: 825,
+    depositDetails: 'משטח סבן',
     deliveryNotePdf: 'https://docs.google.com/viewer?url=https://saban.co.il/docs/delivery_6215188.pdf',
     customerSignature: '',
     syncStatus: false,

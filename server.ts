@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
-import { INITIAL_ORDERS, CATALOG_PRODUCTS } from './src/data/catalog.js';
+import { INITIAL_ORDERS, CATALOG_PRODUCTS, CORE_LOGISTICS_ITEMS } from './src/data/catalog.js';
 import { OrderItem, OrderStatus, CONFIG } from './src/types.js';
 
 dotenv.config();
@@ -188,6 +188,227 @@ app.get('/api/catalog', (req, res) => {
   );
 
   res.json({ products: filtered });
+});
+
+// ---------------- GAS (GOOGLE APPS SCRIPT) & REALTIME SHEET TABS ----------------
+
+// GAS Tab 1: /api/gas/dictionary (מילון_לוגיסטי)
+app.get(['/api/gas/dictionary', '/api/gas/מילון-לוגיסטי'], (req, res) => {
+  res.json({
+    success: true,
+    spreadsheetId: CONFIG.spreadsheetId,
+    tabName: 'מילון_לוגיסטי',
+    totalItems: CATALOG_PRODUCTS.length,
+    coreItems: CORE_LOGISTICS_ITEMS,
+    products: CATALOG_PRODUCTS,
+    fields: ['מק"ט', 'שם_רשמי', 'קטגוריה', 'יחידה', 'מילות_מפתח'],
+    lastSyncedAt: new Date().toISOString(),
+  });
+});
+
+// GAS Tab 1: NLP Normalization Sandbox
+app.post('/api/gas/dictionary/normalize', (req, res) => {
+  const { text } = req.body;
+  if (!text) {
+    return res.status(400).json({ success: false, error: 'Text required' });
+  }
+
+  const lower = text.toLowerCase();
+  const matched: any[] = [];
+
+  CATALOG_PRODUCTS.forEach((p) => {
+    const keys = (p.keywords || '').split(',').map((k) => k.trim().toLowerCase());
+    const isMatched =
+      keys.some((k) => k && lower.includes(k)) ||
+      lower.includes(p.name.toLowerCase()) ||
+      lower.includes(p.sku);
+
+    if (isMatched) {
+      // Regex quantity extraction
+      const regex = new RegExp(`(\\d+)\\s*(?:שק|יח|בלה|לוח|סט|שפופרת|קופסא)?\\s*(?:של)?\\s*${p.name.split(' ')[0]}`, 'i');
+      const m = text.match(regex);
+      const qty = m && m[1] ? parseInt(m[1], 10) : 1;
+
+      matched.push({
+        sku: p.sku,
+        officialName: p.name,
+        category: p.category || 'כללי',
+        unit: p.unit,
+        quantity: qty,
+        keywords: p.keywords,
+        warehouse: p.warehouse || '🏭 4️⃣(החרש)',
+        defaultDriver: p.defaultDriver || 'חכמת / עלי',
+      });
+    }
+  });
+
+  res.json({
+    success: true,
+    input: text,
+    matchedCount: matched.length,
+    normalizedItems: matched,
+    recommendedDriver: matched.some((i) => i.unit === 'בלה' || i.officialName.includes('בלוק'))
+      ? 'חכמת (מנוף)'
+      : 'עלי (משאית רגילה)',
+  });
+});
+
+// GAS Tab 2: /api/gas/insert-order & /api/gas/הכנס-הזמנה (סידור_עבודה_יומי)
+const handleGasInsertOrder = async (req: express.Request, res: express.Response) => {
+  try {
+    const body = req.body;
+    const orderNumber = body.orderNumber || body['מזהה_הזמנה'] || `SN-${Math.floor(1000 + Math.random() * 9000)}`;
+    const customerName = body.customerName || body['שם_לקוח'] || 'לקוח חדש';
+    const destination = body.destination || body['יעד'] || 'אתר לקוח';
+    const deliveryTime = body.deliveryTime || body['שעת_אספקה'] || '10:00';
+    const driver = body.driver || body['נהג'] || 'חכמת / עלי';
+    const status = (body.status || body['סטטוס'] || 'pending') as OrderStatus;
+    const items = body.items || [];
+    const notes = body.notes || body['הערות'] || '';
+    const craneRequired = body.craneRequired !== undefined ? body.craneRequired : items.some((i: any) => (i.unit && i.unit.includes('בלה')) || (i.name && i.name.includes('בלוק')));
+    const floor = body.floor || body['קומה'] || 'קרקע';
+    const siteContact = body.siteContact || body['איש_קשר'] || '';
+    const sitePhone = body.sitePhone || body['טלפון_באתר'] || '';
+    const warehouse = body.warehouse || body['מחסן'] || (craneRequired ? '🏭 4️⃣(החרש)' : '🏟️ 1️⃣(התלמיד)');
+
+    const newOrder: OrderItem = {
+      id: `ord-${Date.now()}`,
+      orderNumber,
+      customerName,
+      customerPhone: body.customerPhone || '',
+      destination,
+      deliveryTime,
+      driver,
+      status,
+      items: items.map((it: any) => ({
+        sku: it.sku || '',
+        name: it.name || it.officialName || 'פריט',
+        quantity: Number(it.quantity) || 1,
+        unit: it.unit || 'יח\'',
+      })),
+      notes,
+      craneRequired,
+      floor,
+      siteContact,
+      sitePhone,
+      warehouse,
+      deliveryNotePdf: `https://docs.google.com/viewer?url=https://saban.co.il/docs/delivery_${orderNumber}.pdf`,
+      customerSignature: '',
+      syncStatus: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      source: 'app',
+    };
+
+    ordersStore.unshift(newOrder);
+
+    // Format Google Sheet Row representation for Tab 2
+    const sheetRow = {
+      'מזהה_הזמנה': newOrder.orderNumber,
+      'שם_לקוח': newOrder.customerName,
+      'יעד': newOrder.destination,
+      'נהג': newOrder.driver,
+      'פרטי_פריטים': newOrder.items.map((i) => `${i.name} (${i.quantity} ${i.unit})`).join(', '),
+      'סטטוס': newOrder.status,
+      'מחסן': newOrder.warehouse,
+      'שעה': newOrder.deliveryTime,
+    };
+
+    // Attempt real-time webhook dispatch
+    try {
+      fetch(CONFIG.makeWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'gas_insert_order',
+          spreadsheetId: CONFIG.spreadsheetId,
+          tab: 'סידור_עבודה_יומי',
+          row: sheetRow,
+          order: newOrder,
+        }),
+      }).catch(() => {});
+    } catch {}
+
+    const wazeUrl = `https://waze.com/ul?q=${encodeURIComponent(newOrder.destination)}&navigate=yes`;
+    const whatsappText = `🚚 *הזמנה חדשה שובצה בסידור [${newOrder.orderNumber}]*\n👤 לקוח: ${newOrder.customerName}\n📍 יעד: ${newOrder.destination}\n⏰ שעה: ${newOrder.deliveryTime}\n🚛 נהג: ${newOrder.driver}\n📦 פריטים: ${newOrder.items.map((i) => `${i.name} (${i.quantity} ${i.unit})`).join(', ')}`;
+    const whatsappLink = `https://api.whatsapp.com/send?phone=${CONFIG.veredPhone.replace(/[^0-9]/g, '')}&text=${encodeURIComponent(whatsappText)}`;
+
+    res.json({
+      success: true,
+      order: newOrder,
+      sheetRow,
+      wazeUrl,
+      whatsappLink,
+      allOrders: ordersStore,
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, error: (error as Error).message });
+  }
+};
+
+app.post('/api/gas/insert-order', handleGasInsertOrder);
+app.post('/api/gas/הכנס-הזמנה', handleGasInsertOrder);
+
+// GAS Tab 3: /api/gas/delivery-notes (תעודות_משלוח_וחתימות)
+app.get('/api/gas/delivery-notes', (req, res) => {
+  const deliveryNotes = ordersStore.map((o) => ({
+    'מזהה_הזמנה': o.orderNumber,
+    'תעודת_משלוח_PDF': o.deliveryNotePdf || `https://saban.co.il/docs/delivery_${o.orderNumber}.pdf`,
+    'חתימת_לקוח': o.customerSignature ? 'נחתם דיגיטלית' : 'ממתין לחתימה',
+    'חתימת_לקוח_Base64': o.customerSignature || '',
+    'סטטוס_סנכרון': o.syncStatus || !!o.customerSignature ? 'מסונכרן ל-Sheets' : 'ממתין לסנכרון',
+    customerName: o.customerName,
+    destination: o.destination,
+    driver: o.driver,
+    items: o.items,
+    status: o.status,
+    orderId: o.id,
+  }));
+
+  res.json({
+    success: true,
+    spreadsheetId: CONFIG.spreadsheetId,
+    tabName: 'תעודות_משלוח_וחתימות',
+    notes: deliveryNotes,
+    fields: ['מזהה_הזמנה', 'תעודת_משלוח_PDF', 'חתימת_לקוח', 'סטטוס_סנכרון'],
+  });
+});
+
+// GAS Tab 3: Sign delivery note
+app.post('/api/gas/sign-note', (req, res) => {
+  const { orderId, signature } = req.body;
+  const orderIndex = ordersStore.findIndex((o) => o.id === orderId || o.orderNumber === orderId);
+
+  if (orderIndex === -1) {
+    return res.status(404).json({ success: false, error: 'תעודת משלוח לא נמצאה' });
+  }
+
+  ordersStore[orderIndex] = {
+    ...ordersStore[orderIndex],
+    customerSignature: signature || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="40"><path d="M10 25 Q 30 5, 50 25 T 90 20" stroke="%2310b981" stroke-width="3" fill="none"/></svg>',
+    syncStatus: true,
+    status: 'delivered',
+    updatedAt: new Date().toISOString(),
+  };
+
+  res.json({
+    success: true,
+    order: ordersStore[orderIndex],
+    allOrders: ordersStore,
+  });
+});
+
+// GAS Sync Trigger for Tab
+app.post('/api/gas/sync-tab', (req, res) => {
+  const { tab } = req.body; // 'מילון_לוגיסטי' | 'סידור_עבודה_יומי' | 'תעודות_משלוח_וחתימות'
+  res.json({
+    success: true,
+    tab: tab || 'כל הטאבים',
+    spreadsheetId: CONFIG.spreadsheetId,
+    syncedAt: new Date().toISOString(),
+    status: 'online',
+    recordsCount: tab === 'מילון_לוגיסטי' ? CATALOG_PRODUCTS.length : ordersStore.length,
+  });
 });
 
 // 9. Send WhatsApp Webhook (Make / JONI / Firebase RTDB)
