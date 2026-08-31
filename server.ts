@@ -743,45 +743,55 @@ app.post('/api/chat', async (req, res) => {
     ).join('\n');
 
     const systemInstruction = `
-את "נועה AI" - מנהלת הסידור, הלוגיסטיקה, התפעול, צי הרכבים ונרמול ההזמנות החכמה של חברת "ח. סבן" (חומרי בניין, גבס ואספקה טכנית).
-את עובדת בממשק וואטסאפ מודרני מול מנהלת הסידור ורד (טלפון: ${CONFIG.veredPhone}) ומול מנהלי עבודה, נהגים וקבלנים.
+את "נועה AI 🌹" - הסדרנית ויד ימינו של ראמי ומנהלת הלוגיסטיקה, התפעול, צי הרכבים ונרמול ההזמנות 24/7 של "ח. סבן חומרי בניין בע"מ" (SabanOS Autonomous Logistics).
+את פועלת ברציפות לצד ראמי, גליה, ורד (טלפון: ${CONFIG.veredPhone}) ומול הנהגים חכמת ועלי ומנהלי העבודה.
 
-🚚 צי הרכבים, הנהגים והמחסנים של ח. סבן:
-1. 🏗️ **חכמת — משאית מנוף**
-   - **סוג הרכב:** משאית מרצדס מנוף
-   - **מספר רישוי:** 615-41-002
-   - **ייעוד ומשימות:** מיועדת להובלות כבדות הדורשות פריקת מנוף (זרוע מנוף 9 מטר / 15 מטר / 24 מטר) לפריקה לקומות, מרפסות, גגות וקרקע כבדה.
-   - **חומרי משא מרכזיים:** משנעת בעיקר חומרי מחצבה כבדים: בלות חול, סומסום, טיט מוכן, שקי מלט, בלוקים ומשטחים כבדים.
-   - **מחסן יציאה:** יוצאת לרוב מ**מחסן 4 (החרש)** – המחסן המרכזי של החברה לחומרי בניין כבדים.
+🧠 תפקידי ליבה ואוטומציות 24/7 של נועה AI:
+1. 📧 **קליטת אימיילים ו-OCR אוטומטי לתעודות משלוח (24/7):**
+   - קליטה וניתוח תעודות מקומקס (ramims@saban94.co.il) ותעודות סרוקות חתומות מגליה (galya@saban94.co.il).
+   - פענוח פריטים, מק"טים, כמויות, מחסני מקור ומניעת כפילויות.
 
-2. 🚚 **עלי — משאית רגילה / פתוחה**
-   - **סוג הרכב:** משאית רגילה (משאית עלי, ללא מנוף - פתוחה / שטוחה / סגורה).
-   - **ייעוד ומשימות:** מיועדת להובלות ללא פריקת מנוף (פריקה ידנית או פריקה קלה באתר).
-   - **חומרי משא מרכזיים:** משנעת בעיקר מערכות גבס (לוחות גבס לבן / ירוק / כחול), פרופילי מתכת (ניצבים ומסלולים), צבעים, דבקים וציוד קל.
-   - **מחסן יציאה:** יוצאת באופן תדיר מ**מחסן 1 (התלמיד)** – המחסן הייעודי לחומרי גבס ומוצרים קלים.
+2. 📁 **סנכרון חכם ל-Google Drive:**
+   - מיון ושיוך אוטומטי לעץ תיקיות לקוח: 'ח. סבן / תיקיות לקוחות / [שם לקוח] / [שנה-חודש] / [מספר הזמנה]'.
 
-💡 **מנגנון השיבוץ החכם של נועה AI:**
-בעת ניתוח הזמנה חדשה (מטקסט חופשי, קובץ או טופס), את מבצעת בדיקה אוטומטית של:
-1. **משקל הפריטים וסוג החומר:** חומרי מחצבה כבדים/בלות/שקים/בלוקים -> משובץ ל**חכמת (מנוף 615-41-002, מחסן 4 החרש)**.
-2. **מערכות גבס/פרופילים/צבעים/ציוד קל:** ללא צורך במנוף -> משובץ ל**עלי (משאית רגילה, מחסן 1 התלמיד)**.
-3. **דרישת מנוף/קומה:** אם צוינה קומה או פריקת מנוף -> אוטומטית חכמת.
+3. 📖 **מילון לוגיסטי ונרמול מק"טים מדויק:**
+   - "סומסום שק גדול" ➔ מק"ט 11511 (1,500 ק"ג) + שק בלה פקדון 60002.
+   - "חול שק גדול" ➔ מק"ט 11501 (1,500 ק"ג) + שק בלה פקדון 60002.
+   - "טיט שק גדול" ➔ מק"ט 11551 (1,500 ק"ג) + שק בלה פקדון 60002.
+   - "מלט אפור 25 ק"ג" ➔ מק"ט 10002. תוספת אוטומטית של משטח סבן (60060) לכל 20-40 שקים.
+   - "בלוק בטון 20/20/40" ➔ מק"ט 12204 + פקדון משטח בלוקים 60006.
 
-רשימת המוצרים במילון הלוגיסטי (קטלוג רשמי):
-${catalogText}
+4. 🚚 **צי הרכבים, הנהגים והשיבוץ החכם (ח. סבן):**
+   - 🏗️ **חכמת — משאית מרצדס מנוף (רישוי 615-41-002):**
+     • מיועדת להובלות כבדות עם פריקת מנוף (זרוע 9 מ'/15 מ'/24 מ') לפריקה לקומות, מרפסות וגגות.
+     • חומרי משא: בלות חול, סומסום, טיט, שקי מלט, בלוקים ומשטחים.
+     • מחסן יציאה מרכזי: **מחסן 4 (החרש)** (32.1326, 34.8982).
+   - 🚚 **עלי — משאית רגילה / פתוחה (משאית עלי):**
+     • מיועדת להובלות ללא מנוף (פריקה ידנית או פריקה קלה באתר).
+     • חומרי משא: לוחות גבס (לבן/ירוק/כחול), פרופילי מתכת (ניצבים/מסלולים), צבעים, דבקים וציוד קל.
+     • מחסן יציאה מרכזי: **מחסן 1 (התלמיד)** (32.1630, 34.8948).
 
-רשימת ההזמנות הנוכחית בסידור העבודה להיום:
+5. 🔍 **בקרת התאמה וחריגות (תעודות משלוח מול קומקס וטכוגרף):**
+   - אימות 100% התאמה לחיוב.
+   - הצלבת שעות פריקת מנוף מול נתוני טכוגרף ברכב.
+   - טיפול בחריגות שטח: אספקה חלקית/חוסר (למשל: שבתי גני חוסר 11 שקים), חסימת גישה ברחוב (למשל: ערן אזולאי בתל אביב - מעבר מנוף בלבד, החזרת סחורה למחסן 4), והחזרת פקדונות.
+
+🔍 זיהוי לקוחות מהיר (Fuzzy Search):
+כששואלים על לקוח לפי שם חלקי (בזלת, בזלת מזר, שטיכמוס, ערוגת, יוסי כהן, קבלני השרון, אלון גולדשטיין, שבתי גני, ערן אזולאי) או לפי טלפון/כתובת (שיבת ציון 12, הנשיא 44 וכו') - זהי את הלקוח מיד והציגי את כרטיס ההזמנה המלא, הסטטוס, הנהג, המשקל והפקדונות.
+
+רשימת ההזמנות המלאה כרגע בסידור:
 ${ordersSummaryText}
 
-הנחיות מענה:
-1. עני תמיד בעברית טבעית, מקצועית, שירותית, ישירה וחמה בסגנון וואטסאפ (עם אימוג'ים מתאימים 🚚🏗️📦✨).
-2. אם ההודעה מכילה בקשה להזמנה חדשה או נרמול פריטים, פרקי והציגי טבלת/רשימת נרמול מסודרת הכוללת:
-   - מק"ט (SKU)
-   - שם פריט רשמי
-   - כמות ויחידת מידה
-   - שיוך רכב ונהג מומלץ (חכמת משאית מרצדס מנוף 615-41-002 מחסן 4 / עלי משאית רגילה מחסן 1)
-   - מחסן יציאה מומלץ (4 החרש מול 1 התלמיד)
-3. אם המשתמש שואל על צי הרכבים, נהגים, רישוי, לו"ז של חכמת או עלי, שעות או זינוקים - השיבי במדויק מתוך נתוני הסידור וצי הרכבים.
-4. בסוף הצעת הזמנה או עדכון, צייני שניתן לשדר בלחיצה ישירה ל-Make Webhook של ורד או ל-JONI RTDB.
+רשימת מוצרים מהמילון הלוגיסטי:
+${catalogText}
+
+🎨 הנחיות עיצוב מענה:
+- עני בטון מקצועי, אנרגטי, שירותי, חם ומסור ("אני על זה!", "הפרטים נבדקו ואומתו").
+- הציגי נתונים בטבלאות מעוצבות או בכרטיסי וואטסאפ ברורים עם קישורי Waze ופקדונות.
+- בסיום כל תשובה הוסיפי את החתימה הרשמית:
+---
+באהבה ובשירותיות, **נועה ❤️ | סדרנית ויד ימינו של ראמי**
+*SabanOS 24/7 Autonomy*
 `;
 
     // Local heuristic matching helper
@@ -808,15 +818,57 @@ ${ordersSummaryText}
       }
     });
 
+    // Fuzzy search across existing orders for customer inquiries
+    const matchedOrders = ordersStore.filter((o) => {
+      const q = lower.replace(/[-\s]/g, '');
+      const name = o.customerName.toLowerCase().replace(/[-\s]/g, '');
+      const cNum = (o.customerNumber || '').toLowerCase().replace(/[-\s]/g, '');
+      const phone = (o.customerPhone || '').replace(/[-\s]/g, '');
+      const dest = o.destination.toLowerCase().replace(/[-\s]/g, '');
+      const oNum = o.orderNumber.toLowerCase().replace(/[-\s]/g, '');
+      const site = (o.siteContact || '').toLowerCase().replace(/[-\s]/g, '');
+
+      return (
+        name.includes(q) ||
+        q.includes(name.slice(0, 4)) ||
+        (cNum && (cNum.includes(q) || q.includes(cNum))) ||
+        (phone && phone.length > 4 && q.includes(phone)) ||
+        dest.includes(q) ||
+        oNum.includes(q) ||
+        site.includes(q) ||
+        (q.includes('בזלת') && name.includes('בזלת')) ||
+        (q.includes('שטיכמוס') && name.includes('שטיכמוס')) ||
+        (q.includes('ערוגת') && (name.includes('ערוגת') || dest.includes('ערוגת'))) ||
+        (q.includes('שבתי') && name.includes('שבתי')) ||
+        (q.includes('אזולאי') && name.includes('אזולאי')) ||
+        (q.includes('שיבת ציון') && dest.includes('שיבת ציון'))
+      );
+    });
+
     const ai = getAIClient();
     if (!ai) {
       // Fallback rule-based smart response
-      let fallbackText = `היי! קיבלתי את פנייתך. יש לנו כרגע ${ordersStore.length} הזמנות פעילות בסידור העבודה.`;
+      let fallbackText = `היי! אני על זה. יש לנו כרגע ${ordersStore.length} הזמנות פעילות בסידור העבודה של ח. סבן.`;
       
-      if (normalizedItems.length > 0) {
-        const isCrane = normalizedItems.some((i) => i.unit === 'בלה' || i.name.includes('בלוק') || i.name.includes('חול') || i.name.includes('סומסום') || i.name.includes('טיט'));
+      if (matchedOrders.length > 0) {
+        const o = matchedOrders[0];
+        const statusBadge = o.status === 'delivered' ? 'סופק במלואו ✅' : o.status === 'issue' ? 'נעצר לבקרה ⚠️' : 'בסידור עבודה ⏳';
+        fallbackText = `🔍 *זיהיתי את הלקוח:* **${o.customerName}** (הזמנה #${o.orderNumber})\n\n` +
+          `📊 *סטטוס אספקה:* ${statusBadge}\n` +
+          `📍 *יעד:* ${o.destination} (${o.city})\n` +
+          `🚚 *נהג משובץ:* ${o.driver} | ${o.truckType}\n` +
+          `🏢 *מחסן יציאה:* ${o.warehouse}\n` +
+          `⚖️ *משקל כולל:* ${o.totalWeightTons} טון (${o.totalWeightKg} ק"ג)\n` +
+          `📦 *פקדונות:* ${o.depositDetails || 'ללא'}\n` +
+          `🕒 *שעת יעד:* ${o.deliveryTime}\n` +
+          (o.verificationCheck ? `🔍 *בדיקת התאמה:* ${o.verificationCheck}\n` : '') +
+          (o.notes ? `📝 *הערות שטח:* ${o.notes}\n` : '') +
+          `\n📁 *נתיב Drive:* \`ח. סבן / תיקיות לקוחות / ${o.customerName} / 2026-08 / ${o.orderNumber}\`\n\n` +
+          `---\nבאהבה ובשירותיות, **נועה ❤️ | סדרנית ויד ימינו של ראמי**\n*SabanOS 24/7 Autonomy*`;
+      } else if (normalizedItems.length > 0) {
+        const isCrane = normalizedItems.some((i) => i.unit === 'בלה' || i.name.includes('בלוק') || i.name.includes('חול') || i.name.includes('סומסום') || i.name.includes('טיט') || i.name.includes('מלט'));
         const recommendedDriver = isCrane ? 'חכמת (מנוף)' : 'עלי (משאית רגילה)';
-        const recommendedTruck = isCrane ? 'משאית מרצדס מנוף (רישוי: 615-41-002, זרוע מנוף)' : 'משאית רגילה / פתוחה (משאית עלי)';
+        const recommendedTruck = isCrane ? 'משאית מרצדס מנוף (רישוי: 615-41-002, זרוע מנוף)' : 'משאית רגילה (משאית עלי)';
         const warehouse = isCrane ? '🏭 מחסן 4 (החרש) - חומרי בניין כבדים' : '🏟️ מחסן 1 (התלמיד) - גבס ומוצרים קלים';
 
         fallbackText = `📦 *זיהיתי ונירמלתי ${normalizedItems.length} פריטים לפי המילון הלוגיסטי של ח. סבן:*\n\n` +
@@ -825,7 +877,8 @@ ${ordersSummaryText}
           `🚛 *נהג משובץ:* ${recommendedDriver}\n` +
           `🚜 *סוג רכב:* ${recommendedTruck}\n` +
           `🏢 *מחסן יציאה:* ${warehouse}\n` +
-          `\nהאם תרצה שאפתח כרטיס הזמנה בסידור או אשדר לוורד בוואטסאפ?`;
+          `\nהפרטים אומתו ומוכנים לשיגור או לעדכון בסידור!\n\n` +
+          `---\nבאהבה ובשירותיות, **נועה ❤️ | סדרנית ויד ימינו של ראמי**\n*SabanOS 24/7 Autonomy*`;
       } else if (message.includes('רכב') || message.includes('צי') || message.includes('נהג')) {
         fallbackText = `🚚 *צי הרכבים והנהגים של ח. סבן:*\n\n` +
           `1. 🏗️ *חכמת — משאית מנוף*\n` +
@@ -837,17 +890,23 @@ ${ordersSummaryText}
           `   • רכב: משאית רגילה (משאית עלי ללא מנוף)\n` +
           `   • ייעוד: הובלות ללא מנוף למערכות גבס וציוד קל\n` +
           `   • חומרים: לוחות גבס (לבן/ירוק/כחול), פרופילי מתכת, צבעים, דבקים\n` +
-          `   • מחסן: 🏟️ מחסן 1 (התלמיד) - הייעודי לגבס וציוד קל`;
+          `   • מחסן: 🏟️ מחסן 1 (התלמיד) - הייעודי לגבס וציוד קל\n\n` +
+          `---\nבאהבה ובשירותיות, **נועה ❤️ | סדרנית ויד ימינו של ראמי**\n*SabanOS 24/7 Autonomy*`;
       } else if (message.includes('בוקר') || message.includes('דוח')) {
-        fallbackText = `בוקר טוב! ☀️ הנה תקציר סידור העבודה להיום בח. סבן:\nסה"כ ${ordersStore.length} הזמנות. חכמת (מרצדס מנוף 615-41-002) יוצא ממחסן 4 (החרש) ועלי יוצא ממחסן 1 (התלמיד).`;
+        fallbackText = `בוקר טוב ראמי וצוות ח. סבן! ☀️ הנה תמונת מצב הסידור להיום:\nסה"כ ${ordersStore.length} הזמנות. חכמת (מרצדס מנוף 615-41-002) יוצא ממחסן 4 (החרש) ועלי יוצא ממחסן 1 (התלמיד).\n\n` +
+          `---\nבאהבה ובשירותיות, **נועה ❤️ | סדרנית ויד ימינו של ראמי**\n*SabanOS 24/7 Autonomy*`;
       } else if (message.includes('חכמת') || message.includes('מנוף')) {
-        const craneOrders = ordersStore.filter((o) => o.craneRequired || o.driver.includes('מנוף') || o.driver.includes('02'));
+        const craneOrders = ordersStore.filter((o) => o.craneRequired || o.driver.includes('מנוף'));
         fallbackText = `🏗️ *לחכמת (מרצדס מנוף 615-41-002 - מחסן 4 החרש)* משובצות כרגע ${craneOrders.length} הזמנות:\n` +
-          craneOrders.map((o) => `• [${o.deliveryTime}] ${o.orderNumber} - ${o.customerName} (${o.destination})`).join('\n');
+          craneOrders.map((o) => `• [${o.deliveryTime}] ${o.orderNumber} - ${o.customerName} (${o.destination})`).join('\n') +
+          `\n\n---\nבאהבה ובשירותיות, **נועה ❤️ | סדרנית ויד ימינו של ראמי**\n*SabanOS 24/7 Autonomy*`;
       } else if (message.includes('עלי')) {
         const aliOrders = ordersStore.filter((o) => o.driver.includes('עלי'));
         fallbackText = `🚚 *לעלי (משאית רגילה - מחסן 1 התלמיד)* משובצות כרגע ${aliOrders.length} הזמנות:\n` +
-          aliOrders.map((o) => `• [${o.deliveryTime}] ${o.orderNumber} - ${o.customerName} (${o.destination})`).join('\n');
+          aliOrders.map((o) => `• [${o.deliveryTime}] ${o.orderNumber} - ${o.customerName} (${o.destination})`).join('\n') +
+          `\n\n---\nבאהבה ובשירותיות, **נועה ❤️ | סדרנית ויד ימינו של ראמי**\n*SabanOS 24/7 Autonomy*`;
+      } else {
+        fallbackText = `שלום! אני נועה AI 🌹, הסדרנית ויד ימינו של ראמי. אני מנהלת את הסידור 24/7, קולטת תעודות מקומקס וגליה, מנרמלת מק"טים לפי המילון הלוגיסטי ומשבצת לחכמת (מנוף 615-41-002) ולעלי (משאית רגילה).\n\nבמה אוכל לעזור?\n\n---\nבאהבה ובשירותיות, **נועה ❤️ | סדרנית ויד ימינו של ראמי**\n*SabanOS 24/7 Autonomy*`;
       }
 
       return res.json({
@@ -855,11 +914,15 @@ ${ordersSummaryText}
         reply: fallbackText,
         sender: 'noa',
         normalizedItems: normalizedItems.length > 0 ? normalizedItems : undefined,
+        matchedOrders: matchedOrders.length > 0 ? matchedOrders : undefined,
         timestamp: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
       });
     }
 
-    const conversationPrompt = `הודעת המשתמש: "${message}"\nאנא השב בתור נועה AI (מנהלת סידור ולוגיסטיקה). אם יש מוצרים, נרמלי אותם לפי המילון הלוגיסטי.`;
+    const conversationPrompt = `הודעת המשתמש: "${message}"
+אם ההודעה מתייחסת ללקוח, חפש בהזמנות, החזר פירוט מלא, נהג, סטטוס, משקל ופקדונות.
+אם ההודעה מכילה מוצרים, נרמל לפי המילון הלוגיסטי.
+זכור לסיים עם החתימה של נועה.`;
 
     const aiResponse = await ai.models.generateContent({
       model: 'gemini-3.7-flash',
@@ -877,6 +940,7 @@ ${ordersSummaryText}
       reply,
       sender: 'noa',
       normalizedItems: normalizedItems.length > 0 ? normalizedItems : undefined,
+      matchedOrders: matchedOrders.length > 0 ? matchedOrders : undefined,
       timestamp: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
     });
   } catch (error) {

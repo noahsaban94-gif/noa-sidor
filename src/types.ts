@@ -66,7 +66,7 @@ export interface OrderItem {
   notes?: string;
   customerSignature?: string;
   syncStatus?: boolean;
-  source?: 'google_sheets' | 'app' | 'whatsapp_ai';
+  source?: 'google_sheets' | 'app' | 'whatsapp_ai' | 'comax' | 'email_ocr';
 }
 
 // 18-Column Google Sheets Tab 2 Row Representation
@@ -148,11 +148,12 @@ export interface ChatMessage {
   status?: 'sent' | 'delivered' | 'read';
   actionPrompt?: string;
   suggestedAction?: {
-    type: 'send_webhook' | 'create_order' | 'update_time' | 'export_report';
+    type: 'send_webhook' | 'create_order' | 'update_time' | 'export_report' | 'dispatch_whatsapp' | 'audio_briefing' | 'open_drive';
     title: string;
     payload?: any;
   };
   orderData?: Partial<OrderItem>;
+  matchedOrders?: OrderItem[];
   normalizedItems?: OrderProduct[];
   rawText?: string;
 }
@@ -239,11 +240,6 @@ export const STATUS_MAP: Record<OrderStatus, { label: string; color: string; bg:
 export const DRIVERS_LIST = [
   'חכמת (מנוף)',
   'עלי (משאית רגילה)',
-  'משאית 02',
-  'משאית 09',
-  'חכמת / עלי',
-  'מוביל חיצוני',
-  'ללא שיבוץ',
 ];
 
 export interface DriverFleetProfile {
