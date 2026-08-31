@@ -92,6 +92,12 @@ export const OrderCard: React.FC<OrderCardProps> = ({
             </span>
           )}
 
+          {order.city && (
+            <span className="text-[11px] text-cyan-300 bg-cyan-950/30 px-2 py-0.5 rounded border border-cyan-500/30 font-medium">
+              {order.city}
+            </span>
+          )}
+
           {warehouse && (
             <span className="text-[11px] text-amber-300 bg-amber-950/30 px-2 py-0.5 rounded border border-amber-500/30 font-medium">
               {warehouse}

@@ -16,29 +16,101 @@ export interface OrderProduct {
 
 export interface OrderItem {
   id: string;
-  orderNumber: string; // Order_ID (e.g. 6215184 or SN-4091)
+  // 1. מספר הזמנה
+  orderNumber: string;
+  // 2. שם לקוח
   customerName: string;
+  // 3. מספר לקוח
+  customerNumber?: string;
   customerPhone?: string;
+  // 4. כתובת אתר / יעד
   destination: string;
-  deliveryTime: string; // HH:mm
-  driver: string; // "חכמת (מנוף)", "עלי", "חכמת / עלי", "משאית 09" etc.
-  status: OrderStatus;
-  items: OrderProduct[];
-  notes?: string;
+  // 5. עיר
+  city?: string;
+  // 6. מחסן יציאה
+  warehouse?: string; // (🏭 4️⃣(החרש) / 🏟️ 1️⃣(התלמיד))
+  // 7. נהג משובץ
+  driver: string;
+  // 8. סוג משאית / מנוף
+  truckType?: string; // משאית מנוף / משאית רגילה פתוחה / משאית סגורה
   craneRequired?: boolean;
+  // 9. שעת אספקה
+  deliveryTime: string; // HH:mm
+  // 10. משקל כולל (טון)
+  totalWeightTons?: number;
+  totalWeightKg?: number;
+  // 11. פירוט פריטים ומק"טים
+  items: OrderProduct[];
+  // 12. בלות פקדון
+  depositBigBags?: number;
+  // 13. משטחים פקדון
+  depositPallets?: number;
+  depositDetails?: string;
+  // 14. סטטוס ביצוע
+  status: OrderStatus;
+  // 15. קישור Waze
+  wazeUrl?: string;
+  // 16. קובץ הזמנה (Drive)
+  driveFileUrl?: string;
+  deliveryNotePdf?: string;
+  // 17. זמן עדכון אחרון
+  updatedAt: string;
+  createdAt: string;
+  // 18. בדיקה
+  verificationCheck?: string; // תקין לשיגור / נדרש תיאום מנוף / מאושר ע"י ורד / ממתין לחתימה
+
+  // שדות עזר נוספים
   floor?: string;
   siteContact?: string;
   sitePhone?: string;
-  warehouse?: string; // מחסן מקור (🏭 4️⃣(החרש) / 🏟️ 1️⃣(התלמיד))
-  totalWeightKg?: number;
-  depositDetails?: string;
-  deliveryNotePdf?: string; // תעודת משלוח PDF
-  customerSignature?: string; // חתימת לקוח
-  syncStatus?: boolean; // סנכרון תעודה
-  createdAt: string;
-  updatedAt: string;
+  notes?: string;
+  customerSignature?: string;
+  syncStatus?: boolean;
   source?: 'google_sheets' | 'app' | 'whatsapp_ai';
 }
+
+// 18-Column Google Sheets Tab 2 Row Representation
+export interface GasTabOrderRow {
+  'מספר הזמנה': string;
+  'שם לקוח': string;
+  'מספר לקוח': string;
+  'כתובת אתר / יעד': string;
+  'עיר': string;
+  'מחסן יציאה': string;
+  'נהג משובץ': string;
+  'סוג משאית / מנוף': string;
+  'שעת אספקה': string;
+  'משקל כולל (טון)': string;
+  'פירוט פריטים ומק"טים': string;
+  'בלות פקדון': string;
+  'משטחים פקדון': string;
+  'סטטוס ביצוע': string;
+  'קישור Waze': string;
+  'קובץ הזמנה (Drive)': string;
+  'זמן עדכון אחרון': string;
+  'בדיקה': string;
+}
+
+export const GAS_TAB_COLUMNS = [
+  'מספר הזמנה',
+  'שם לקוח',
+  'מספר לקוח',
+  'כתובת אתר / יעד',
+  'עיר',
+  'מחסן יציאה',
+  'נהג משובץ',
+  'סוג משאית / מנוף',
+  'שעת אספקה',
+  'משקל כולל (טון)',
+  'פירוט פריטים ומק"טים',
+  'בלות פקדון',
+  'משטחים פקדון',
+  'סטטוס ביצוע',
+  'קישור Waze',
+  'קובץ הזמנה (Drive)',
+  'זמן עדכון אחרון',
+  'בדיקה',
+] as const;
 
 export interface CatalogProduct {
   sku: string; // SKU
@@ -167,9 +239,46 @@ export const STATUS_MAP: Record<OrderStatus, { label: string; color: string; bg:
 export const DRIVERS_LIST = [
   'חכמת (מנוף)',
   'עלי (משאית רגילה)',
-  'חכמת / עלי',
   'משאית 02',
   'משאית 09',
+  'חכמת / עלי',
   'מוביל חיצוני',
   'ללא שיבוץ',
+];
+
+export interface DriverFleetProfile {
+  id: string;
+  driverName: string;
+  vehicleType: string;
+  licensePlate: string;
+  craneSpec?: string;
+  primaryMaterials: string[];
+  primaryWarehouse: string;
+  description: string;
+  icon: string;
+}
+
+export const FLEET_PROFILES: DriverFleetProfile[] = [
+  {
+    id: 'hachmat',
+    driverName: 'חכמת',
+    vehicleType: 'משאית מרצדס מנוף',
+    licensePlate: '615-41-002',
+    craneSpec: 'זרוע מנוף 9 מטר / 15 מטר / 24 מטר',
+    primaryMaterials: ['בלות חול', 'סומסום', 'טיט מוכן', 'שקי מלט', 'בלוקים', 'משטחים כבדים'],
+    primaryWarehouse: '🏭 4️⃣(החרש)',
+    description: 'מיועדת להובלות כבדות הדורשות פריקת מנוף לגובה/מרפסות/גגות מחסן 4 (החרש)',
+    icon: '🏗️',
+  },
+  {
+    id: 'ali',
+    driverName: 'עלי',
+    vehicleType: 'משאית רגילה / פתוחה',
+    licensePlate: 'משאית עלי',
+    craneSpec: 'ללא מנוף (משאית שטוחה/סגורה)',
+    primaryMaterials: ['לוחות גבס (לבן/ירוק/כחול)', 'פרופילי מתכת (ניצבים/מסלולים)', 'צבעים', 'דבקים', 'ציוד קל'],
+    primaryWarehouse: '🏟️ 1️⃣(התלמיד)',
+    description: 'מיועדת להובלות ללא מנוף מחסן 1 (התלמיד) עבור מערכות גבס ומוצרים קלים',
+    icon: '🚚',
+  },
 ];

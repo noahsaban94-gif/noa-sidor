@@ -34,7 +34,17 @@ export default function App() {
     const saved = localStorage.getItem('siddur_noa_orders');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed: OrderItem[] = JSON.parse(saved);
+        // Filter out any dummy orders like 6215187
+        const cleaned = parsed.filter((o) => o.orderNumber !== '6215187');
+        // If 6215184 is present, make sure driver is updated to 'משאית 02' if it was old
+        const synchronized = cleaned.map((o) => {
+          if (o.orderNumber === '6215184' && o.driver === 'חכמת (מנוף)') {
+            return { ...o, driver: 'משאית 02' };
+          }
+          return o;
+        });
+        if (synchronized.length > 0) return synchronized;
       } catch {
         return INITIAL_ORDERS;
       }
@@ -58,27 +68,65 @@ export default function App() {
     localStorage.setItem('siddur_noa_orders', JSON.stringify(orders));
   }, [orders]);
 
-  // Fetch live orders from server
-  const fetchOrders = async () => {
-    setIsRefreshing(true);
+  // Fetch live orders from server & GAS Tab 2
+  const fetchOrders = async (silent = false) => {
+    if (!silent) setIsRefreshing(true);
     try {
-      const res = await fetch('/api/orders');
+      const res = await fetch('/api/gas/daily-schedule');
       if (res.ok) {
         const data = await res.json();
         if (data.orders && Array.isArray(data.orders)) {
-          setOrders(data.orders);
+          // Remove dummy orders
+          const valid = data.orders.filter((o: OrderItem) => o.orderNumber !== '6215187');
+          setOrders(valid);
+        }
+      } else {
+        const fallbackRes = await fetch('/api/orders');
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          if (fallbackData.orders && Array.isArray(fallbackData.orders)) {
+            const valid = fallbackData.orders.filter((o: OrderItem) => o.orderNumber !== '6215187');
+            setOrders(valid);
+          }
         }
       }
     } catch (err) {
       console.warn('Server fetch offline, using cached state:', err);
     } finally {
-      setIsRefreshing(false);
+      if (!silent) setIsRefreshing(false);
     }
   };
 
+  // Initial load and real-time polling every 6 seconds
   useEffect(() => {
-    fetchOrders();
+    fetchOrders(false);
+    const interval = setInterval(() => {
+      fetchOrders(true);
+    }, 6000);
+    return () => clearInterval(interval);
   }, []);
+
+  // Reset to 4 Official Orders
+  const handleResetToOfficial = async () => {
+    try {
+      setIsRefreshing(true);
+      const res = await fetch('/api/orders/reset', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.allOrders) {
+          setOrders(data.allOrders);
+          localStorage.setItem('siddur_noa_orders', JSON.stringify(data.allOrders));
+          showToast('סידור העבודה אופס וסונכרן ל-4 ההזמנות הרשמיות');
+        }
+      }
+    } catch (err) {
+      setOrders(INITIAL_ORDERS);
+      localStorage.setItem('siddur_noa_orders', JSON.stringify(INITIAL_ORDERS));
+      showToast('הסידור אופס בהצלחה ל-4 ההזמנות הרשמיות');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Update order status
   const handleUpdateStatus = async (id: string, newStatus: OrderStatus) => {
@@ -280,6 +328,7 @@ export default function App() {
               onOpenReports={() => setActiveTab('reports')}
               onOpenChat={() => setActiveTab('chat')}
               onRefreshSchedule={fetchOrders}
+              onResetSchedule={handleResetToOfficial}
             />
           )}
 

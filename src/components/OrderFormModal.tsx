@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Package, Search, Truck, AlertTriangle, Clock, MapPin, User } from 'lucide-react';
+import { X, Plus, Trash2, Package, Search, Truck, AlertTriangle, Clock, MapPin, User, Sparkles } from 'lucide-react';
 import { OrderItem, OrderProduct, OrderStatus, DRIVERS_LIST } from '../types';
 import { CATALOG_PRODUCTS } from '../data/catalog';
+import { calculateOrderMetrics } from '../utils/logistics';
 
 interface OrderFormModalProps {
   isOpen: boolean;
@@ -17,12 +18,21 @@ export const OrderFormModal: React.FC<OrderFormModalProps> = ({
   editingOrder,
 }) => {
   const [customerName, setCustomerName] = useState('');
+  const [customerNumber, setCustomerNumber] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [destination, setDestination] = useState('');
+  const [city, setCity] = useState('');
+  const [warehouse, setWarehouse] = useState('🏭 4️⃣(החרש)');
   const [deliveryTime, setDeliveryTime] = useState('08:00');
   const [driver, setDriver] = useState('חכמת (מנוף)');
+  const [truckType, setTruckType] = useState('משאית מנוף (זרוע 24 מטר)');
   const [status, setStatus] = useState<OrderStatus>('pending');
   const [craneRequired, setCraneRequired] = useState(false);
+  const [depositBigBags, setDepositBigBags] = useState<number>(0);
+  const [depositPallets, setDepositPallets] = useState<number>(0);
+  const [wazeUrl, setWazeUrl] = useState('');
+  const [driveFileUrl, setDriveFileUrl] = useState('');
+  const [verificationCheck, setVerificationCheck] = useState('תקין לשיגור');
   const [floor, setFloor] = useState('');
   const [siteContact, setSiteContact] = useState('');
   const [sitePhone, setSitePhone] = useState('');
@@ -38,12 +48,21 @@ export const OrderFormModal: React.FC<OrderFormModalProps> = ({
   useEffect(() => {
     if (editingOrder) {
       setCustomerName(editingOrder.customerName || '');
+      setCustomerNumber(editingOrder.customerNumber || `C-${editingOrder.orderNumber}`);
       setCustomerPhone(editingOrder.customerPhone || '');
       setDestination(editingOrder.destination || '');
+      setCity(editingOrder.city || '');
+      setWarehouse(editingOrder.warehouse || '🏭 4️⃣(החרש)');
       setDeliveryTime(editingOrder.deliveryTime || '08:00');
       setDriver(editingOrder.driver || 'חכמת (מנוף)');
+      setTruckType(editingOrder.truckType || (editingOrder.craneRequired ? 'משאית מנוף (זרוע 24 מטר)' : 'משאית רגילה פתוחה'));
       setStatus(editingOrder.status || 'pending');
       setCraneRequired(editingOrder.craneRequired || false);
+      setDepositBigBags(editingOrder.depositBigBags || 0);
+      setDepositPallets(editingOrder.depositPallets || 0);
+      setWazeUrl(editingOrder.wazeUrl || '');
+      setDriveFileUrl(editingOrder.driveFileUrl || editingOrder.deliveryNotePdf || '');
+      setVerificationCheck(editingOrder.verificationCheck || 'תקין לשיגור');
       setFloor(editingOrder.floor || '');
       setSiteContact(editingOrder.siteContact || '');
       setSitePhone(editingOrder.sitePhone || '');
@@ -51,12 +70,21 @@ export const OrderFormModal: React.FC<OrderFormModalProps> = ({
       setItems(editingOrder.items && editingOrder.items.length > 0 ? [...editingOrder.items] : [{ name: '', quantity: 1, unit: 'יח\'' }]);
     } else {
       setCustomerName('');
+      setCustomerNumber('');
       setCustomerPhone('');
       setDestination('');
+      setCity('');
+      setWarehouse('🏭 4️⃣(החרש)');
       setDeliveryTime('08:00');
       setDriver('חכמת (מנוף)');
+      setTruckType('משאית מנוף (זרוע 24 מטר)');
       setStatus('pending');
       setCraneRequired(false);
+      setDepositBigBags(0);
+      setDepositPallets(0);
+      setWazeUrl('');
+      setDriveFileUrl('');
+      setVerificationCheck('תקין לשיגור');
       setFloor('');
       setSiteContact('');
       setSitePhone('');
@@ -81,6 +109,16 @@ export const OrderFormModal: React.FC<OrderFormModalProps> = ({
     setItems(next);
   };
 
+  const applySmartDispatch = (currentItems = items) => {
+    const metrics = calculateOrderMetrics(currentItems);
+    setDriver(metrics.recommendedDriver);
+    setTruckType(metrics.recommendedTruckType);
+    setWarehouse(metrics.warehouse);
+    setCraneRequired(metrics.hasCraneItem || !!floor);
+    if (metrics.depositBigBags > 0) setDepositBigBags(metrics.depositBigBags);
+    if (metrics.depositPallets > 0) setDepositPallets(metrics.depositPallets);
+  };
+
   const handleSelectCatalogItem = (index: number, catalogItem: typeof CATALOG_PRODUCTS[0]) => {
     const next = [...items];
     next[index] = {
@@ -91,12 +129,7 @@ export const OrderFormModal: React.FC<OrderFormModalProps> = ({
     };
     setItems(next);
     setShowCatalogDropdown(null);
-
-    // Auto-check crane if needed
-    if (catalogItem.defaultDriver && catalogItem.defaultDriver.includes('מנוף')) {
-      setCraneRequired(true);
-      setDriver('חכמת (מנוף)');
-    }
+    applySmartDispatch(next);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -109,12 +142,21 @@ export const OrderFormModal: React.FC<OrderFormModalProps> = ({
     onSave({
       ...(editingOrder ? { id: editingOrder.id, orderNumber: editingOrder.orderNumber } : {}),
       customerName,
+      customerNumber: customerNumber || `C-${Math.floor(10000 + Math.random() * 90000)}`,
       customerPhone,
       destination,
+      city: city || (destination.includes('הרצליה') ? 'הרצליה' : destination.includes('הוד השרון') ? 'הוד השרון' : destination.includes('רעננה') ? 'רעננה' : destination.includes('רמת השרון') ? 'רמת השרון' : destination.includes('כפר סבא') ? 'כפר סבא' : 'מרכז'),
+      warehouse,
       deliveryTime,
       driver,
+      truckType,
       status,
       craneRequired,
+      depositBigBags: Number(depositBigBags) || 0,
+      depositPallets: Number(depositPallets) || 0,
+      wazeUrl: wazeUrl || `https://waze.com/ul?q=${encodeURIComponent(destination)}&navigate=yes`,
+      driveFileUrl: driveFileUrl || `https://drive.google.com/open?id=doc-${editingOrder?.orderNumber || 'new'}`,
+      verificationCheck,
       floor,
       siteContact,
       sitePhone,
@@ -148,8 +190,8 @@ export const OrderFormModal: React.FC<OrderFormModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4 pt-4 text-xs">
-          {/* Customer & Phone */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Customer & Customer Number & Phone */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-slate-300 font-medium mb-1">שם לקוח / קבלן *</label>
               <div className="relative">
@@ -166,6 +208,17 @@ export const OrderFormModal: React.FC<OrderFormModalProps> = ({
             </div>
 
             <div>
+              <label className="block text-slate-300 font-medium mb-1">מספר לקוח (ח"פ / קוד)</label>
+              <input
+                type="text"
+                placeholder="לדוגמה: C-10492"
+                value={customerNumber}
+                onChange={(e) => setCustomerNumber(e.target.value)}
+                className="w-full px-3 py-2 bg-black/60 border border-white/10 rounded-xl text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none font-mono transition"
+              />
+            </div>
+
+            <div>
               <label className="block text-slate-300 font-medium mb-1">טלפון לקוח</label>
               <input
                 type="tel"
@@ -177,16 +230,16 @@ export const OrderFormModal: React.FC<OrderFormModalProps> = ({
             </div>
           </div>
 
-          {/* Destination & Floor */}
+          {/* Destination, City, Floor */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2">
+            <div>
               <label className="block text-slate-300 font-medium mb-1">יעד / כתובת אתר *</label>
               <div className="relative">
                 <MapPin className="w-4 h-4 text-rose-400 absolute right-3 top-2.5" />
                 <input
                   type="text"
                   required
-                  placeholder="לדוגמה: הרצליה פיתוח, רחוב הנשיא 44"
+                  placeholder="רחוב הנשיא 44"
                   value={destination}
                   onChange={(e) => setDestination(e.target.value)}
                   className="w-full pr-9 pl-3 py-2 bg-black/60 border border-white/10 rounded-xl text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none transition"
@@ -195,10 +248,21 @@ export const OrderFormModal: React.FC<OrderFormModalProps> = ({
             </div>
 
             <div>
+              <label className="block text-slate-300 font-medium mb-1">עיר (טאב 2)</label>
+              <input
+                type="text"
+                placeholder="לדוגמה: הרצליה, הוד השרון, רעננה"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="w-full px-3 py-2 bg-black/60 border border-white/10 rounded-xl text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none transition"
+              />
+            </div>
+
+            <div>
               <label className="block text-slate-300 font-medium mb-1">קומה / מיקום פריקה</label>
               <input
                 type="text"
-                placeholder="לדוגמה: קומה 2 / חצר"
+                placeholder="לדוגמה: קומה 2 / מרפסת"
                 value={floor}
                 onChange={(e) => setFloor(e.target.value)}
                 className="w-full px-3 py-2 bg-black/60 border border-white/10 rounded-xl text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none transition"
@@ -206,20 +270,18 @@ export const OrderFormModal: React.FC<OrderFormModalProps> = ({
             </div>
           </div>
 
-          {/* Time, Driver, Crane Required */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Warehouse, Truck Type, Delivery Time, Driver */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
-              <label className="block text-slate-300 font-medium mb-1">שעת אספקה *</label>
-              <div className="relative">
-                <Clock className="w-4 h-4 text-amber-400 absolute right-3 top-2.5" />
-                <input
-                  type="time"
-                  required
-                  value={deliveryTime}
-                  onChange={(e) => setDeliveryTime(e.target.value)}
-                  className="w-full pr-9 pl-3 py-2 bg-black/60 border border-white/10 rounded-xl text-amber-300 font-mono font-bold focus:border-emerald-500 focus:outline-none transition"
-                />
-              </div>
+              <label className="block text-slate-300 font-medium mb-1">מחסן יציאה</label>
+              <select
+                value={warehouse}
+                onChange={(e) => setWarehouse(e.target.value)}
+                className="w-full px-3 py-2 bg-black/60 border border-white/10 rounded-xl text-slate-100 focus:border-emerald-500 focus:outline-none transition"
+              >
+                <option value="🏭 4️⃣(החרש)" className="bg-[#0c1017]">🏭 4️⃣(החרש) - חומרי מליטה ובלות</option>
+                <option value="🏟️ 1️⃣(התלמיד)" className="bg-[#0c1017]">🏟️ 1️⃣(התלמיד) - גבס ואיטום</option>
+              </select>
             </div>
 
             <div>
@@ -237,17 +299,82 @@ export const OrderFormModal: React.FC<OrderFormModalProps> = ({
               </select>
             </div>
 
-            <div className="flex items-center pt-5">
+            <div>
+              <label className="block text-slate-300 font-medium mb-1">סוג משאית / מנוף</label>
+              <input
+                type="text"
+                value={truckType}
+                onChange={(e) => setTruckType(e.target.value)}
+                placeholder="משאית מנוף 24מ' / רגילה"
+                className="w-full px-3 py-2 bg-black/60 border border-white/10 rounded-xl text-slate-100 focus:border-emerald-500 focus:outline-none transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-300 font-medium mb-1">שעת אספקה *</label>
+              <div className="relative">
+                <Clock className="w-4 h-4 text-amber-400 absolute right-3 top-2.5" />
+                <input
+                  type="time"
+                  required
+                  value={deliveryTime}
+                  onChange={(e) => setDeliveryTime(e.target.value)}
+                  className="w-full pr-9 pl-3 py-2 bg-black/60 border border-white/10 rounded-xl text-amber-300 font-mono font-bold focus:border-emerald-500 focus:outline-none transition"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Deposits, Verification Check, Status */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-black/40 p-3 rounded-2xl border border-white/[0.06]">
+            <div>
+              <label className="block text-slate-300 font-medium mb-1">בלות פקדון (כמות)</label>
+              <input
+                type="number"
+                min="0"
+                value={depositBigBags}
+                onChange={(e) => setDepositBigBags(Number(e.target.value))}
+                className="w-full px-3 py-1.5 bg-black/60 border border-white/10 rounded-xl text-slate-100 font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 font-medium mb-1">משטחים פקדון</label>
+              <input
+                type="number"
+                min="0"
+                value={depositPallets}
+                onChange={(e) => setDepositPallets(Number(e.target.value))}
+                className="w-full px-3 py-1.5 bg-black/60 border border-white/10 rounded-xl text-slate-100 font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 font-medium mb-1">עמודת בדיקה</label>
+              <input
+                type="text"
+                value={verificationCheck}
+                onChange={(e) => setVerificationCheck(e.target.value)}
+                placeholder="תקין לשיגור / מאושר"
+                className="w-full px-3 py-1.5 bg-black/60 border border-white/10 rounded-xl text-slate-100"
+              />
+            </div>
+            <div className="flex items-center pt-4">
               <label className="flex items-center gap-2 cursor-pointer p-2 rounded-xl bg-black/60 border border-white/10 w-full hover:border-amber-500/50 transition">
                 <input
                   type="checkbox"
                   checked={craneRequired}
-                  onChange={(e) => setCraneRequired(e.target.checked)}
+                  onChange={(e) => {
+                    setCraneRequired(e.target.checked);
+                    if (e.target.checked) {
+                      setDriver('חכמת (מנוף)');
+                      setTruckType('משאית מנוף (זרוע 24 מטר)');
+                      setWarehouse('🏭 4️⃣(החרש)');
+                    }
+                  }}
                   className="w-4 h-4 text-emerald-500 rounded focus:ring-0 bg-slate-900 border-slate-700"
                 />
                 <span className="font-bold text-amber-300 flex items-center gap-1">
                   <AlertTriangle className="w-3.5 h-3.5" />
-                  דורש מנוף (חכמת)
+                  דורש מנוף
                 </span>
               </label>
             </div>
@@ -284,14 +411,25 @@ export const OrderFormModal: React.FC<OrderFormModalProps> = ({
                 <Package className="w-4 h-4 text-emerald-400" />
                 פריטים וחומרי בניין להזמנה
               </label>
-              <button
-                type="button"
-                onClick={handleAddItem}
-                className="px-2.5 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-bold flex items-center gap-1 transition"
-              >
-                <Plus className="w-3 h-3" />
-                <span>הוסף שורת פריט</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => applySmartDispatch()}
+                  className="px-2.5 py-1 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded-lg text-[11px] font-bold flex items-center gap-1 transition"
+                  title="בצע שיבוץ רכב, נהג, מחסן ופקדונות לפי כללי ח. סבן"
+                >
+                  <Sparkles className="w-3 h-3 text-amber-400" />
+                  <span>שיבוץ חכם נועה AI</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddItem}
+                  className="px-2.5 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-bold flex items-center gap-1 transition"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>הוסף שורת פריט</span>
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2 max-h-48 overflow-y-auto pr-1">

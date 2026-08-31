@@ -81,18 +81,61 @@ app.post('/api/orders', (req, res) => {
   try {
     const newOrderData = req.body as Partial<OrderItem>;
     const orderNumber = newOrderData.orderNumber || `SN-${Math.floor(1000 + Math.random() * 9000)}`;
+    const destination = newOrderData.destination || 'ללא יעד';
+    const city = newOrderData.city || (destination.includes('הרצליה') ? 'הרצליה' : destination.includes('הוד השרון') ? 'הוד השרון' : destination.includes('רעננה') ? 'רעננה' : destination.includes('רמת השרון') ? 'רמת השרון' : destination.includes('כפר סבא') ? 'כפר סבא' : 'מרכז');
+    const craneRequired = newOrderData.craneRequired || (newOrderData.items && newOrderData.items.some((i) => i.unit === 'בלה' || i.name.includes('בלוק'))) || false;
+    const driver = newOrderData.driver || (craneRequired ? 'חכמת (מנוף)' : 'עלי (משאית רגילה)');
+    const truckType = newOrderData.truckType || (craneRequired ? 'משאית מנוף (זרוע 24 מטר)' : 'משאית רגילה פתוחה');
+    const warehouse = newOrderData.warehouse || (craneRequired ? '🏭 4️⃣(החרש)' : '🏟️ 1️⃣(התלמיד)');
+    
+    // Calculate weights & deposits
+    let totalWeightKg = 0;
+    let bigBags = 0;
+    let bags = 0;
+    (newOrderData.items || []).forEach((it) => {
+      const q = Number(it.quantity) || 1;
+      if (it.unit === 'בלה' || it.name.includes('חול') || it.name.includes('חצץ')) {
+        totalWeightKg += q * 1000;
+        bigBags += q;
+      } else if (it.unit === 'שק' || it.name.includes('מלט') || it.name.includes('טיח')) {
+        totalWeightKg += q * 25;
+        bags += q;
+      } else if (it.unit === 'לוח' || it.name.includes('גבס')) {
+        totalWeightKg += q * 25;
+      } else if (it.unit === 'בלוק' || it.name.includes('בלוק')) {
+        totalWeightKg += q * 1150;
+      } else {
+        totalWeightKg += q * 5;
+      }
+    });
+
+    const pallets = bags >= 30 ? Math.ceil(bags / 40) : bags >= 10 ? 1 : 0;
+    const totalWeightTons = Number((totalWeightKg / 1000).toFixed(2));
+
     const newOrder: OrderItem = {
       id: newOrderData.id || `ord-${Date.now()}`,
       orderNumber,
       customerName: newOrderData.customerName || 'לקוח חדש',
+      customerNumber: newOrderData.customerNumber || `C-${orderNumber}`,
       customerPhone: newOrderData.customerPhone || '',
-      destination: newOrderData.destination || 'ללא יעד',
+      destination,
+      city,
+      warehouse,
+      driver,
+      truckType,
       deliveryTime: newOrderData.deliveryTime || '09:00',
-      driver: newOrderData.driver || 'חכמת / עלי',
+      totalWeightTons,
+      totalWeightKg,
+      depositBigBags: newOrderData.depositBigBags ?? bigBags,
+      depositPallets: newOrderData.depositPallets ?? pallets,
+      depositDetails: newOrderData.depositDetails || (bigBags > 0 ? `${bigBags} שקי בלה` : pallets > 0 ? `${pallets} משטח` : 'ללא פקדון'),
       status: (newOrderData.status as OrderStatus) || 'pending',
+      wazeUrl: newOrderData.wazeUrl || `https://waze.com/ul?q=${encodeURIComponent(destination)}&navigate=yes`,
+      driveFileUrl: newOrderData.driveFileUrl || `https://drive.google.com/open?id=doc-${orderNumber}`,
+      verificationCheck: newOrderData.verificationCheck || (craneRequired ? 'נדרש תיאום מנוף' : 'תקין לשיגור'),
       items: newOrderData.items || [],
       notes: newOrderData.notes || '',
-      craneRequired: newOrderData.craneRequired || false,
+      craneRequired,
       floor: newOrderData.floor || 'קרקע',
       siteContact: newOrderData.siteContact || '',
       sitePhone: newOrderData.sitePhone || '',
@@ -167,10 +210,16 @@ app.put('/api/orders/:id', (req, res) => {
 });
 
 // 7. Delete order
-app.delete('/api/orders/:id', (req, res) => {
+app.delete(['/api/orders/:id', '/api/gas/orders/:id'], (req, res) => {
   const { id } = req.params;
-  ordersStore = ordersStore.filter((o) => o.id !== id);
+  ordersStore = ordersStore.filter((o) => o.id !== id && o.orderNumber !== id);
   res.json({ success: true, allOrders: ordersStore });
+});
+
+// 7.1 Reset to official schedule
+app.post(['/api/orders/reset', '/api/gas/reset-schedule'], (req, res) => {
+  ordersStore = [...INITIAL_ORDERS];
+  res.json({ success: true, message: 'הסידור אופס בהצלחה ל-4 ההזמנות הרשמיות', allOrders: ordersStore });
 });
 
 // 8. Catalog Search
@@ -242,49 +291,115 @@ app.post('/api/gas/dictionary/normalize', (req, res) => {
     }
   });
 
+  const isCrane = matched.some((i) => i.unit === 'בלה' || i.officialName.includes('בלוק') || i.officialName.includes('חול') || i.officialName.includes('סומסום') || i.officialName.includes('טיט'));
+  const isGypsumOrLight = matched.every((i) => i.officialName.includes('גבס') || i.officialName.includes('פרופיל') || i.officialName.includes('צבע') || i.officialName.includes('סופר 7') || i.officialName.includes('להב'));
+
+  const recommendedDriver = isCrane
+    ? 'חכמת (מנוף)'
+    : isGypsumOrLight
+    ? 'עלי (משאית רגילה)'
+    : 'חכמת (מנוף)';
+
+  const recommendedTruck = isCrane
+    ? 'משאית מרצדס מנוף (615-41-002)'
+    : 'משאית רגילה / פתוחה (משאית עלי)';
+
+  const recommendedWarehouse = isCrane ? '🏭 4️⃣(החרש)' : '🏟️ 1️⃣(התלמיד)';
+
   res.json({
     success: true,
     input: text,
     matchedCount: matched.length,
     normalizedItems: matched,
-    recommendedDriver: matched.some((i) => i.unit === 'בלה' || i.officialName.includes('בלוק'))
-      ? 'חכמת (מנוף)'
-      : 'עלי (משאית רגילה)',
+    recommendedDriver,
+    recommendedTruck,
+    recommendedWarehouse,
   });
 });
 
 // GAS Tab 2: /api/gas/daily-schedule & /api/gas/סידור-עבודה-יומי
 const handleGasGetDailySchedule = (req: express.Request, res: express.Response) => {
   const scheduleRows = ordersStore.map((o) => {
-    const totalWeightKg = o.items.reduce((acc, it) => {
-      if (it.unit === 'בלה' || it.name.includes('חול') || it.name.includes('חצץ')) return acc + it.quantity * 1000;
-      if (it.unit === 'שק' || it.name.includes('מלט') || it.name.includes('טיח')) return acc + it.quantity * (it.name.includes('50') ? 50 : it.name.includes('30') ? 30 : 25);
-      if (it.unit === 'לוח' || it.name.includes('גבס')) return acc + it.quantity * 25;
-      if (it.unit === 'בלוק') return acc + it.quantity * 18;
-      return acc + it.quantity * 5;
-    }, 0);
+    let totalWeightKg = o.totalWeightKg || 0;
+    let bigBags = o.depositBigBags || 0;
+    let bagCount = 0;
 
-    const depositDetails = o.items.some((i) => i.unit === 'בלה') ? 'שקי בלה (פקדון סבן)' : 'ללא פקדון';
+    if (!totalWeightKg) {
+      o.items.forEach((it) => {
+        const q = Number(it.quantity) || 1;
+        if (it.unit === 'בלה' || it.name.includes('חול') || it.name.includes('חצץ')) {
+          totalWeightKg += q * 1000;
+          bigBags += q;
+        } else if (it.unit === 'שק' || it.name.includes('מלט') || it.name.includes('טיח')) {
+          totalWeightKg += q * 25;
+          bagCount += q;
+        } else if (it.unit === 'לוח' || it.name.includes('גבס')) {
+          totalWeightKg += q * 25;
+        } else if (it.unit === 'בלוק' || it.name.includes('בלוק')) {
+          totalWeightKg += q * 1150;
+        } else {
+          totalWeightKg += q * 5;
+        }
+      });
+    }
+
+    const pallets = o.depositPallets ?? (bagCount >= 30 ? Math.ceil(bagCount / 40) : bagCount >= 10 ? 1 : 0);
+    const weightTons = o.totalWeightTons || Number((totalWeightKg / 1000).toFixed(2));
+    const city = o.city || (o.destination.includes('הרצליה') ? 'הרצליה' : o.destination.includes('הוד השרון') ? 'הוד השרון' : o.destination.includes('רעננה') ? 'רעננה' : o.destination.includes('רמת השרון') ? 'רמת השרון' : o.destination.includes('כפר סבא') ? 'כפר סבא' : 'מרכז');
     const warehouse = o.warehouse || (o.craneRequired ? '🏭 4️⃣(החרש)' : '🏟️ 1️⃣(התלמיד)');
+    const truckType = o.truckType || (o.craneRequired ? 'משאית מנוף (זרוע 24 מטר)' : 'משאית רגילה פתוחה');
+    const wazeUrl = o.wazeUrl || `https://waze.com/ul?q=${encodeURIComponent(o.destination)}&navigate=yes`;
+    const driveUrl = o.driveFileUrl || o.deliveryNotePdf || `https://drive.google.com/open?id=doc-${o.orderNumber}`;
+    const verification = o.verificationCheck || (o.status === 'delivered' ? 'סופק ואושר' : o.craneRequired ? 'תיאום מנוף בוצע' : 'תקין לשיגור');
+    const statusLabel = o.status === 'pending' ? 'בסידור עבודה' : o.status === 'loading' ? 'בהטענה במחסן' : o.status === 'in_transit' ? 'יצא לחלוקה' : o.status === 'delivered' ? 'סופק בהצלחה' : o.status === 'issue' ? 'עיכוב / בעיה' : 'בוטל';
+    const itemsDetails = o.items.map((i) => `${i.sku ? `[${i.sku}] ` : ''}${i.name} (${i.quantity} ${i.unit})`).join(', ');
+    const updatedTime = o.updatedAt ? new Date(o.updatedAt).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' }) : new Date().toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' });
 
+    // 18 Exact Columns matching user schema
     return {
-      'מזהה_הזמנה': o.orderNumber,
-      'שם_לקוח': o.customerName,
-      'יעד': o.destination,
-      'נהג': o.driver,
-      'פרטי_פריטים': o.items.map((i) => `${i.name} (${i.quantity} ${i.unit})`).join(', '),
-      'סטטוס': o.status,
-      'שעת_אספקה': o.deliveryTime,
-      'מנוף_נדרש': o.craneRequired ? 'כן (חכמת)' : 'לא',
-      'משקל_כולל_קג': `${totalWeightKg.toLocaleString()} ק"ג`,
-      'מקור_מחסן': warehouse,
-      'פרטי_פקדון': depositDetails,
-      'קישור_Waze': `https://waze.com/ul?q=${encodeURIComponent(o.destination)}&navigate=yes`,
-      'הערות': o.notes || '',
+      'מספר הזמנה': o.orderNumber,
+      'שם לקוח': o.customerName,
+      'מספר לקוח': o.customerNumber || `C-${o.orderNumber}`,
+      'כתובת אתר / יעד': o.destination,
+      'עיר': city,
+      'מחסן יציאה': warehouse,
+      'נהג משובץ': o.driver,
+      'סוג משאית / מנוף': truckType,
+      'שעת אספקה': o.deliveryTime,
+      'משקל כולל (טון)': `${weightTons} טון`,
+      'פירוט פריטים ומק"טים': itemsDetails,
+      'בלות פקדון': bigBags > 0 ? `${bigBags} בלות` : '0',
+      'משטחים פקדון': pallets > 0 ? `${pallets} משטחים` : '0',
+      'סטטוס ביצוע': statusLabel,
+      'קישור Waze': wazeUrl,
+      'קובץ הזמנה (Drive)': driveUrl,
+      'זמן עדכון אחרון': updatedTime,
+      'בדיקה': verification,
       id: o.id,
       order: o,
     };
   });
+
+  const exact18Fields = [
+    'מספר הזמנה',
+    'שם לקוח',
+    'מספר לקוח',
+    'כתובת אתר / יעד',
+    'עיר',
+    'מחסן יציאה',
+    'נהג משובץ',
+    'סוג משאית / מנוף',
+    'שעת אספקה',
+    'משקל כולל (טון)',
+    'פירוט פריטים ומק"טים',
+    'בלות פקדון',
+    'משטחים פקדון',
+    'סטטוס ביצוע',
+    'קישור Waze',
+    'קובץ הזמנה (Drive)',
+    'זמן עדכון אחרון',
+    'בדיקה',
+  ];
 
   res.json({
     success: true,
@@ -292,21 +407,8 @@ const handleGasGetDailySchedule = (req: express.Request, res: express.Response) 
     tabName: 'סידור_עבודה_יומי',
     totalOrders: ordersStore.length,
     activeOrders: ordersStore.filter((o) => o.status !== 'delivered' && o.status !== 'cancelled').length,
-    fields: [
-      'מזהה_הזמנה',
-      'שם_לקוח',
-      'יעד',
-      'נהג',
-      'פרטי_פריטים',
-      'סטטוס',
-      'שעת_אספקה',
-      'מנוף_נדרש',
-      'משקל_כולל_קג',
-      'מקור_מחסן',
-      'פרטי_פקדון',
-      'קישור_Waze',
-      'הערות',
-    ],
+    fields: exact18Fields,
+    columnsCount: 18,
     rows: scheduleRows,
     orders: ordersStore,
     lastSyncedAt: new Date().toISOString(),
@@ -641,18 +743,28 @@ app.post('/api/chat', async (req, res) => {
     ).join('\n');
 
     const systemInstruction = `
-את "נועה AI" - מנהלת הסידור, הלוגיסטיקה, התפעול ונרמול ההזמנות החכמה של חברת חומרי הבניין והאספקה ("סידור-נועה").
-את עובדת בממשק וואטסאפ מודרני מול מנהלת הסידור ורד (טלפון: ${CONFIG.veredPhone}) ומול מנהלי עבודה וקבלנים.
+את "נועה AI" - מנהלת הסידור, הלוגיסטיקה, התפעול, צי הרכבים ונרמול ההזמנות החכמה של חברת "ח. סבן" (חומרי בניין, גבס ואספקה טכנית).
+את עובדת בממשק וואטסאפ מודרני מול מנהלת הסידור ורד (טלפון: ${CONFIG.veredPhone}) ומול מנהלי עבודה, נהגים וקבלנים.
 
-תפקידים ראשיים:
-1. נרמול טקסט חופשי של הזמנות (Order Normalization Engine):
-כאשר משתמש/קבלן מקליד הזמנה בטקסט חופשי (למשל: "תביא לי דחוף 20 שק מלט, 3 בלות חול ו-10 חבילות להבים לסכין יפני לאחוזה 50 רעננה לקומה 2"), את מזהה ומנרמלת את המוצרים בדיוק לפי "מילון לוגיסטי":
-- מוצאת את ה-SKU והשם הרשמי המדויק מתוך הקטלוג.
-- מזהה כמויות ויחידות מידה מדויקות (שק, בלה, יח', לוח, שפופרת).
-- קובעת האם נדרש מנוף (שקי בלה, משטחי בלוקים, קומות גבוהות) ומשבצת נהג מתאים (חכמת מנוף או עלי משאית רגילה).
+🚚 צי הרכבים, הנהגים והמחסנים של ח. סבן:
+1. 🏗️ **חכמת — משאית מנוף**
+   - **סוג הרכב:** משאית מרצדס מנוף
+   - **מספר רישוי:** 615-41-002
+   - **ייעוד ומשימות:** מיועדת להובלות כבדות הדורשות פריקת מנוף (זרוע מנוף 9 מטר / 15 מטר / 24 מטר) לפריקה לקומות, מרפסות, גגות וקרקע כבדה.
+   - **חומרי משא מרכזיים:** משנעת בעיקר חומרי מחצבה כבדים: בלות חול, סומסום, טיט מוכן, שקי מלט, בלוקים ומשטחים כבדים.
+   - **מחסן יציאה:** יוצאת לרוב מ**מחסן 4 (החרש)** – המחסן המרכזי של החברה לחומרי בניין כבדים.
 
-2. ניהול ומעקב סידור עבודה חי:
-מעקב אחרי שעות האספקה, מניעת חפיפות בלו"ז, עדכון סטטוסי הזמנות (בסידור, בהטענה, בחלוקה, סופק), והפקת הודעות שידור לוואטסאפ לוורד או לקבלנים.
+2. 🚚 **עלי — משאית רגילה / פתוחה**
+   - **סוג הרכב:** משאית רגילה (משאית עלי, ללא מנוף - פתוחה / שטוחה / סגורה).
+   - **ייעוד ומשימות:** מיועדת להובלות ללא פריקת מנוף (פריקה ידנית או פריקה קלה באתר).
+   - **חומרי משא מרכזיים:** משנעת בעיקר מערכות גבס (לוחות גבס לבן / ירוק / כחול), פרופילי מתכת (ניצבים ומסלולים), צבעים, דבקים וציוד קל.
+   - **מחסן יציאה:** יוצאת באופן תדיר מ**מחסן 1 (התלמיד)** – המחסן הייעודי לחומרי גבס ומוצרים קלים.
+
+💡 **מנגנון השיבוץ החכם של נועה AI:**
+בעת ניתוח הזמנה חדשה (מטקסט חופשי, קובץ או טופס), את מבצעת בדיקה אוטומטית של:
+1. **משקל הפריטים וסוג החומר:** חומרי מחצבה כבדים/בלות/שקים/בלוקים -> משובץ ל**חכמת (מנוף 615-41-002, מחסן 4 החרש)**.
+2. **מערכות גבס/פרופילים/צבעים/ציוד קל:** ללא צורך במנוף -> משובץ ל**עלי (משאית רגילה, מחסן 1 התלמיד)**.
+3. **דרישת מנוף/קומה:** אם צוינה קומה או פריקת מנוף -> אוטומטית חכמת.
 
 רשימת המוצרים במילון הלוגיסטי (קטלוג רשמי):
 ${catalogText}
@@ -666,8 +778,9 @@ ${ordersSummaryText}
    - מק"ט (SKU)
    - שם פריט רשמי
    - כמות ויחידת מידה
-   - שיוך רכב מומלץ (מנוף / רגיל)
-3. אם המשתמש שואל על לו"ז של נהג (חכמת, עלי), שעות, או מבקש להזיז שעה - השיבי במדויק מתוך סידור העבודה.
+   - שיוך רכב ונהג מומלץ (חכמת משאית מרצדס מנוף 615-41-002 מחסן 4 / עלי משאית רגילה מחסן 1)
+   - מחסן יציאה מומלץ (4 החרש מול 1 התלמיד)
+3. אם המשתמש שואל על צי הרכבים, נהגים, רישוי, לו"ז של חכמת או עלי, שעות או זינוקים - השיבי במדויק מתוך נתוני הסידור וצי הרכבים.
 4. בסוף הצעת הזמנה או עדכון, צייני שניתן לשדר בלחיצה ישירה ל-Make Webhook של ורד או ל-JONI RTDB.
 `;
 
@@ -701,19 +814,40 @@ ${ordersSummaryText}
       let fallbackText = `היי! קיבלתי את פנייתך. יש לנו כרגע ${ordersStore.length} הזמנות פעילות בסידור העבודה.`;
       
       if (normalizedItems.length > 0) {
-        const isCrane = normalizedItems.some((i) => i.unit === 'בלה' || i.name.includes('בלוק'));
-        fallbackText = `📦 *זיהיתי ונירמלתי ${normalizedItems.length} פריטים לפי המילון הלוגיסטי:*\n\n` +
+        const isCrane = normalizedItems.some((i) => i.unit === 'בלה' || i.name.includes('בלוק') || i.name.includes('חול') || i.name.includes('סומסום') || i.name.includes('טיט'));
+        const recommendedDriver = isCrane ? 'חכמת (מנוף)' : 'עלי (משאית רגילה)';
+        const recommendedTruck = isCrane ? 'משאית מרצדס מנוף (רישוי: 615-41-002, זרוע מנוף)' : 'משאית רגילה / פתוחה (משאית עלי)';
+        const warehouse = isCrane ? '🏭 מחסן 4 (החרש) - חומרי בניין כבדים' : '🏟️ מחסן 1 (התלמיד) - גבס ומוצרים קלים';
+
+        fallbackText = `📦 *זיהיתי ונירמלתי ${normalizedItems.length} פריטים לפי המילון הלוגיסטי של ח. סבן:*\n\n` +
           normalizedItems.map((it, idx) => `${idx + 1}. *[${it.sku}]* ${it.name} — כמות: ${it.quantity} ${it.unit}`).join('\n') +
-          `\n\n🚛 *שיוך רכב מומלץ:* ${isCrane ? 'חכמת (משאית מנוף - פריקת שקים כבדים/בלה)' : 'עלי (משאית רגילה)'}\n` +
+          `\n\n💡 *שיבוץ חכם ע"י נועה AI:*\n` +
+          `🚛 *נהג משובץ:* ${recommendedDriver}\n` +
+          `🚜 *סוג רכב:* ${recommendedTruck}\n` +
+          `🏢 *מחסן יציאה:* ${warehouse}\n` +
           `\nהאם תרצה שאפתח כרטיס הזמנה בסידור או אשדר לוורד בוואטסאפ?`;
+      } else if (message.includes('רכב') || message.includes('צי') || message.includes('נהג')) {
+        fallbackText = `🚚 *צי הרכבים והנהגים של ח. סבן:*\n\n` +
+          `1. 🏗️ *חכמת — משאית מנוף*\n` +
+          `   • רכב: משאית מרצדס מנוף (רישוי: 615-41-002)\n` +
+          `   • ייעוד: הובלות כבדות עם פריקת מנוף (זרוע 9 מ' / 15 מ' / 24 מ')\n` +
+          `   • חומרים: בלות חול, סומסום, טיט, מלט, בלוקים ומשטחים\n` +
+          `   • מחסן: 🏭 מחסן 4 (החרש) - המרכזי לחומרי בניין כבדים\n\n` +
+          `2. 🚚 *עלי — משאית רגילה / פתוחה*\n` +
+          `   • רכב: משאית רגילה (משאית עלי ללא מנוף)\n` +
+          `   • ייעוד: הובלות ללא מנוף למערכות גבס וציוד קל\n` +
+          `   • חומרים: לוחות גבס (לבן/ירוק/כחול), פרופילי מתכת, צבעים, דבקים\n` +
+          `   • מחסן: 🏟️ מחסן 1 (התלמיד) - הייעודי לגבס וציוד קל`;
       } else if (message.includes('בוקר') || message.includes('דוח')) {
-        fallbackText = `בוקר טוב! ☀️ הנה תקציר סידור העבודה להיום:\nסה"כ ${ordersStore.length} הזמנות. חכמת יוצא בהרצליה ב-07:30 ועלי בהוד השרון ב-09:00.`;
+        fallbackText = `בוקר טוב! ☀️ הנה תקציר סידור העבודה להיום בח. סבן:\nסה"כ ${ordersStore.length} הזמנות. חכמת (מרצדס מנוף 615-41-002) יוצא ממחסן 4 (החרש) ועלי יוצא ממחסן 1 (התלמיד).`;
       } else if (message.includes('חכמת') || message.includes('מנוף')) {
-        const craneOrders = ordersStore.filter((o) => o.craneRequired || o.driver.includes('מנוף'));
-        fallbackText = `לחכמת (מנוף) משובצות כרגע ${craneOrders.length} הזמנות:\n` + craneOrders.map((o) => `• ${o.orderNumber} - ${o.customerName} (${o.destination}) בשעה ${o.deliveryTime}`).join('\n');
+        const craneOrders = ordersStore.filter((o) => o.craneRequired || o.driver.includes('מנוף') || o.driver.includes('02'));
+        fallbackText = `🏗️ *לחכמת (מרצדס מנוף 615-41-002 - מחסן 4 החרש)* משובצות כרגע ${craneOrders.length} הזמנות:\n` +
+          craneOrders.map((o) => `• [${o.deliveryTime}] ${o.orderNumber} - ${o.customerName} (${o.destination})`).join('\n');
       } else if (message.includes('עלי')) {
         const aliOrders = ordersStore.filter((o) => o.driver.includes('עלי'));
-        fallbackText = `לעלי משובצות כרגע ${aliOrders.length} הזמנות:\n` + aliOrders.map((o) => `• ${o.orderNumber} - ${o.customerName} (${o.destination}) בשעה ${o.deliveryTime}`).join('\n');
+        fallbackText = `🚚 *לעלי (משאית רגילה - מחסן 1 התלמיד)* משובצות כרגע ${aliOrders.length} הזמנות:\n` +
+          aliOrders.map((o) => `• [${o.deliveryTime}] ${o.orderNumber} - ${o.customerName} (${o.destination})`).join('\n');
       }
 
       return res.json({
