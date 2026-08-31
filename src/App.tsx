@@ -279,6 +279,7 @@ export default function App() {
               onSendWhatsApp={(ord) => setShareOrder(ord)}
               onOpenReports={() => setActiveTab('reports')}
               onOpenChat={() => setActiveTab('chat')}
+              onRefreshSchedule={fetchOrders}
             />
           )}
 

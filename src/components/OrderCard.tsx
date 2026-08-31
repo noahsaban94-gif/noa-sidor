@@ -366,13 +366,23 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         </div>
       )}
 
-      {/* Footer Actions: WhatsApp dispatch & Time */}
-      <div className="flex items-center justify-between pt-2 border-t border-white/[0.08]">
-        <span className="text-[10px] text-slate-500 font-mono">
-          עודכן: {new Date(order.updatedAt).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
-        </span>
+      {/* Footer Actions: Edit Order, WhatsApp dispatch & Time */}
+      <div className="flex items-center justify-between pt-3 border-t border-white/[0.08] gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-mono">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+          <span>טאב 2 מסונכרן</span>
+        </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => onEdit(order)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-semibold transition active:scale-95 shadow-sm"
+            title="ערוך את כל פרטי ההזמנה, פריטים, יעד ושעה"
+          >
+            <Edit2 className="w-3.5 h-3.5 text-cyan-400" />
+            <span>ערוך פרטים</span>
+          </button>
+
           <button
             onClick={() => onSendWhatsApp(order)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition active:scale-95"

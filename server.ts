@@ -253,6 +253,163 @@ app.post('/api/gas/dictionary/normalize', (req, res) => {
   });
 });
 
+// GAS Tab 2: /api/gas/daily-schedule & /api/gas/סידור-עבודה-יומי
+const handleGasGetDailySchedule = (req: express.Request, res: express.Response) => {
+  const scheduleRows = ordersStore.map((o) => {
+    const totalWeightKg = o.items.reduce((acc, it) => {
+      if (it.unit === 'בלה' || it.name.includes('חול') || it.name.includes('חצץ')) return acc + it.quantity * 1000;
+      if (it.unit === 'שק' || it.name.includes('מלט') || it.name.includes('טיח')) return acc + it.quantity * (it.name.includes('50') ? 50 : it.name.includes('30') ? 30 : 25);
+      if (it.unit === 'לוח' || it.name.includes('גבס')) return acc + it.quantity * 25;
+      if (it.unit === 'בלוק') return acc + it.quantity * 18;
+      return acc + it.quantity * 5;
+    }, 0);
+
+    const depositDetails = o.items.some((i) => i.unit === 'בלה') ? 'שקי בלה (פקדון סבן)' : 'ללא פקדון';
+    const warehouse = o.warehouse || (o.craneRequired ? '🏭 4️⃣(החרש)' : '🏟️ 1️⃣(התלמיד)');
+
+    return {
+      'מזהה_הזמנה': o.orderNumber,
+      'שם_לקוח': o.customerName,
+      'יעד': o.destination,
+      'נהג': o.driver,
+      'פרטי_פריטים': o.items.map((i) => `${i.name} (${i.quantity} ${i.unit})`).join(', '),
+      'סטטוס': o.status,
+      'שעת_אספקה': o.deliveryTime,
+      'מנוף_נדרש': o.craneRequired ? 'כן (חכמת)' : 'לא',
+      'משקל_כולל_קג': `${totalWeightKg.toLocaleString()} ק"ג`,
+      'מקור_מחסן': warehouse,
+      'פרטי_פקדון': depositDetails,
+      'קישור_Waze': `https://waze.com/ul?q=${encodeURIComponent(o.destination)}&navigate=yes`,
+      'הערות': o.notes || '',
+      id: o.id,
+      order: o,
+    };
+  });
+
+  res.json({
+    success: true,
+    spreadsheetId: CONFIG.spreadsheetId,
+    tabName: 'סידור_עבודה_יומי',
+    totalOrders: ordersStore.length,
+    activeOrders: ordersStore.filter((o) => o.status !== 'delivered' && o.status !== 'cancelled').length,
+    fields: [
+      'מזהה_הזמנה',
+      'שם_לקוח',
+      'יעד',
+      'נהג',
+      'פרטי_פריטים',
+      'סטטוס',
+      'שעת_אספקה',
+      'מנוף_נדרש',
+      'משקל_כולל_קג',
+      'מקור_מחסן',
+      'פרטי_פקדון',
+      'קישור_Waze',
+      'הערות',
+    ],
+    rows: scheduleRows,
+    orders: ordersStore,
+    lastSyncedAt: new Date().toISOString(),
+    status: 'connected',
+  });
+};
+
+app.get(['/api/gas/daily-schedule', '/api/gas/סידור-עבודה-יומי'], handleGasGetDailySchedule);
+
+// Update order status via Tab 2 GAS endpoint
+app.patch(['/api/gas/orders/:id/status', '/api/orders/:id/status'], (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  const orderIndex = ordersStore.findIndex((o) => o.id === id || o.orderNumber === id);
+  if (orderIndex === -1) {
+    return res.status(404).json({ success: false, error: 'הזמנה לא נמצאה' });
+  }
+
+  ordersStore[orderIndex] = {
+    ...ordersStore[orderIndex],
+    status,
+    syncStatus: true,
+    updatedAt: new Date().toISOString(),
+  };
+
+  // Webhook sync
+  try {
+    fetch(CONFIG.makeWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'gas_update_status',
+        tab: 'סידור_עבודה_יומי',
+        orderId: ordersStore[orderIndex].orderNumber,
+        newStatus: status,
+        updatedOrder: ordersStore[orderIndex],
+      }),
+    }).catch(() => {});
+  } catch {}
+
+  res.json({
+    success: true,
+    order: ordersStore[orderIndex],
+    allOrders: ordersStore,
+    tab: 'סידור_עבודה_יומי',
+    syncedAt: new Date().toISOString(),
+  });
+});
+
+// Update order details (full edit) via Tab 2 GAS endpoint
+app.put(['/api/gas/orders/:id', '/api/orders/:id'], (req, res) => {
+  const { id } = req.params;
+  const updatedData = req.body as Partial<OrderItem>;
+
+  const orderIndex = ordersStore.findIndex((o) => o.id === id || o.orderNumber === id);
+  if (orderIndex === -1) {
+    return res.status(404).json({ success: false, error: 'הזמנה לא נמצאה בסידור' });
+  }
+
+  ordersStore[orderIndex] = {
+    ...ordersStore[orderIndex],
+    ...updatedData,
+    syncStatus: true,
+    updatedAt: new Date().toISOString(),
+  };
+
+  // Webhook sync to Make / JONI
+  try {
+    fetch(CONFIG.makeWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'gas_edit_order_details',
+        tab: 'סידור_עבודה_יומי',
+        orderId: ordersStore[orderIndex].orderNumber,
+        updatedOrder: ordersStore[orderIndex],
+      }),
+    }).catch(() => {});
+  } catch {}
+
+  res.json({
+    success: true,
+    order: ordersStore[orderIndex],
+    allOrders: ordersStore,
+    tab: 'סידור_עבודה_יומי',
+    syncedAt: new Date().toISOString(),
+  });
+});
+
+// Trigger full sync of schedule
+app.post(['/api/gas/sync-schedule', '/api/gas/סנכרן-סידור'], (req, res) => {
+  res.json({
+    success: true,
+    tab: 'סידור_עבודה_יומי',
+    spreadsheetId: CONFIG.spreadsheetId,
+    totalOrders: ordersStore.length,
+    syncedAt: new Date().toISOString(),
+    status: 'synced',
+    orders: ordersStore,
+  });
+});
+
 // GAS Tab 2: /api/gas/insert-order & /api/gas/הכנס-הזמנה (סידור_עבודה_יומי)
 const handleGasInsertOrder = async (req: express.Request, res: express.Response) => {
   try {
