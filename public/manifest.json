@@ -1,0 +1,24 @@
+{
+  "name": "סידור-נועה - מערכת סידור עבודה ולוגיסטיקה",
+  "short_name": "סידור-נועה",
+  "description": "מערכת ניהול סידור עבודה, מעקב הזמנות חי, ציר זמנים, צ'אט נועה AI ודוחות ווטסאפ",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0f19",
+  "theme_color": "#090d16",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://i.ibb.co/W4v7BK1W/Gemini-Generated-Image-3.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://i.ibb.co/W4v7BK1W/Gemini-Generated-Image-3.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

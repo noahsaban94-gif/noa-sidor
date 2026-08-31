@@ -1,0 +1,6 @@
+{
+  "name": "סידור-נועה",
+  "description": "מערכת מתקדמת לניהול סידור עבודה לוגיסטי, מעקב הזמנות מול Google Sheets, ציר זמנים אינטראקטיבי, צ'אט נועה AI ושידור דוחות לוואטסאפ",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
