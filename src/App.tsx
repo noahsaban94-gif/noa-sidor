@@ -21,6 +21,7 @@ import { OrdersDashboard } from './components/OrdersDashboard';
 import { TimelineView } from './components/TimelineView';
 import { NoaChatRoom } from './components/NoaChatRoom';
 import { ReportsView } from './components/ReportsView';
+import { DeliveryNotesView } from './components/DeliveryNotesView';
 import { CatalogView } from './components/CatalogView';
 import { SettingsView } from './components/SettingsView';
 import { OrderFormModal } from './components/OrderFormModal';
@@ -304,11 +305,40 @@ export default function App() {
               onSendToWebhook={(msg, target) =>
                 handleSendWebhook({ message: msg, target: target || 'make' })
               }
+              onAddNormalizedOrder={(items, rawText) => {
+                const requiresCrane = items.some((i) => i.unit === 'בלה' || i.name.includes('בלוק'));
+                const newOrderPrefill: Partial<OrderItem> = {
+                  customerName: 'הזמנה מנועה AI',
+                  destination: rawText.includes('רעננה') ? 'רעננה' : rawText.includes('הרצליה') ? 'הרצליה' : 'אתר לקוח',
+                  deliveryTime: '10:30',
+                  driver: requiresCrane ? 'חכמת (מנוף)' : 'עלי',
+                  craneRequired: requiresCrane,
+                  items: items.map((it) => ({
+                    id: `item-${Date.now()}-${Math.random()}`,
+                    sku: it.sku,
+                    name: it.name,
+                    quantity: it.quantity || 1,
+                    unit: it.unit || 'יח׳',
+                  })),
+                  notes: `נוצר ע"י נועה AI מטקסט חופשי: "${rawText}"`,
+                  status: 'pending',
+                };
+                setEditingOrder(newOrderPrefill as OrderItem);
+                setIsOrderModalOpen(true);
+              }}
             />
           )}
 
           {activeTab === 'reports' && (
             <ReportsView orders={orders} onSendWebhook={handleSendWebhook} />
+          )}
+
+          {activeTab === 'delivery_notes' && (
+            <DeliveryNotesView
+              orders={orders}
+              onUpdateOrder={handleSaveOrder}
+              onSendWhatsApp={(ord) => setShareOrder(ord)}
+            />
           )}
 
           {activeTab === 'catalog' && <CatalogView />}

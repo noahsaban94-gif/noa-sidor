@@ -56,8 +56,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: FileSpreadsheet,
     },
     {
+      id: 'delivery_notes',
+      label: 'תעודות משלוח ו-PDF',
+      icon: Sheet,
+    },
+    {
       id: 'catalog',
-      label: 'קטלוג חומרים (מק"טים)',
+      label: 'מילון לוגיסטי (מק"טים)',
       icon: PackageSearch,
     },
     {

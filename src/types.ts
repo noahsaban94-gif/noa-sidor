@@ -1,8 +1,8 @@
 export type OrderStatus =
-  | 'pending' // בסידור עבודה
-  | 'loading' // בהטענה
-  | 'in_transit' // יצא לחלוקה
-  | 'delivered' // סופק
+  | 'pending' // בסידור עבודה (Pending)
+  | 'loading' // בהטענה במחסן (Loading)
+  | 'in_transit' // יצא לחלוקה / בדרך (In Progress)
+  | 'delivered' // סופק (Delivered)
   | 'issue' // בעיה / עיכוב
   | 'cancelled'; // בוטל
 
@@ -16,7 +16,7 @@ export interface OrderProduct {
 
 export interface OrderItem {
   id: string;
-  orderNumber: string;
+  orderNumber: string; // Order_ID (e.g. 6215184 or SN-4091)
   customerName: string;
   customerPhone?: string;
   destination: string;
@@ -29,19 +29,40 @@ export interface OrderItem {
   floor?: string;
   siteContact?: string;
   sitePhone?: string;
+  deliveryNotePdf?: string; // תעודת משלוח PDF
+  customerSignature?: string; // חתימת לקוח
+  syncStatus?: boolean; // סנכרון תעודה
   createdAt: string;
   updatedAt: string;
   source?: 'google_sheets' | 'app' | 'whatsapp_ai';
 }
 
 export interface CatalogProduct {
-  sku: string;
-  name: string;
-  unit: string;
-  keywords?: string;
+  sku: string; // SKU
+  name: string; // Official_Name
+  category?: string; // Category (e.g. כלי עבודה, חומרי מליטה)
+  unit: string; // Unit (יח', שק, בלה)
+  keywords?: string; // Keywords for NLP matching
   deposit?: string;
   weightKg?: number;
+  warehouse?: string; // מחסן מקור (למשל: 🏭 4️⃣(החרש), 🏟️ 1️⃣(התלמיד))
   defaultDriver?: string;
+}
+
+export interface DeliveryNoteItem {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  customerName: string;
+  destination: string;
+  driver: string;
+  date: string;
+  pdfUrl: string;
+  customerSignature?: string;
+  syncStatus: boolean;
+  itemsCount: number;
+  totalQuantity: number;
+  signedAt?: string;
 }
 
 export interface ChatMessage {
@@ -57,6 +78,8 @@ export interface ChatMessage {
     payload?: any;
   };
   orderData?: Partial<OrderItem>;
+  normalizedItems?: OrderProduct[];
+  rawText?: string;
 }
 
 export interface LogisticsReport {

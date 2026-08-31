@@ -246,7 +246,7 @@ app.post('/api/webhook/send', async (req, res) => {
   }
 });
 
-// 10. AI Chat with Noa AI (WhatsApp Style)
+// 10. AI Chat & Order Normalization with Noa AI (WhatsApp Style)
 app.post('/api/chat', async (req, res) => {
   try {
     const { message, history } = req.body;
@@ -258,30 +258,78 @@ app.post('/api/chat', async (req, res) => {
       )
       .join('\n');
 
-    const systemInstruction = `
-את "נועה AI" - מנהלת הסידור, הלוגיסטיקה והתפעול החכמה של חברת חומרי הבניין והאספקה ("סידור-נועה").
-התפקיד שלך הוא לנהל את סידור העבודה היומי, לעקוב אחרי הנהגים (חכמת במנוף, עלי במשאית רגילה, משאית 02, משאית 09), לעדכן סטטוסי הזמנות, להמליץ על שעות והתאמות מנוף, ולייצר הודעות וואטסאפ מנוסחות היטב לוורד (טלפון: ${CONFIG.veredPhone}) וללקוחות.
+    const catalogText = CATALOG_PRODUCTS.map(
+      (p) => `• מק"ט: ${p.sku} | שם: ${p.name} | יחידה: ${p.unit} | מילות מפתח: ${p.keywords || ''} | נהג מומלץ: ${p.defaultDriver || 'עלי'}`
+    ).join('\n');
 
-רשימת ההזמנות הנוכחית בסידור להיום:
+    const systemInstruction = `
+את "נועה AI" - מנהלת הסידור, הלוגיסטיקה, התפעול ונרמול ההזמנות החכמה של חברת חומרי הבניין והאספקה ("סידור-נועה").
+את עובדת בממשק וואטסאפ מודרני מול מנהלת הסידור ורד (טלפון: ${CONFIG.veredPhone}) ומול מנהלי עבודה וקבלנים.
+
+תפקידים ראשיים:
+1. נרמול טקסט חופשי של הזמנות (Order Normalization Engine):
+כאשר משתמש/קבלן מקליד הזמנה בטקסט חופשי (למשל: "תביא לי דחוף 20 שק מלט, 3 בלות חול ו-10 חבילות להבים לסכין יפני לאחוזה 50 רעננה לקומה 2"), את מזהה ומנרמלת את המוצרים בדיוק לפי "מילון לוגיסטי":
+- מוצאת את ה-SKU והשם הרשמי המדויק מתוך הקטלוג.
+- מזהה כמויות ויחידות מידה מדויקות (שק, בלה, יח', לוח, שפופרת).
+- קובעת האם נדרש מנוף (שקי בלה, משטחי בלוקים, קומות גבוהות) ומשבצת נהג מתאים (חכמת מנוף או עלי משאית רגילה).
+
+2. ניהול ומעקב סידור עבודה חי:
+מעקב אחרי שעות האספקה, מניעת חפיפות בלו"ז, עדכון סטטוסי הזמנות (בסידור, בהטענה, בחלוקה, סופק), והפקת הודעות שידור לוואטסאפ לוורד או לקבלנים.
+
+רשימת המוצרים במילון הלוגיסטי (קטלוג רשמי):
+${catalogText}
+
+רשימת ההזמנות הנוכחית בסידור העבודה להיום:
 ${ordersSummaryText}
 
-מחירון ומוצרים מרכזיים:
-- מלט אפור (שק 25 ק"ג), טיח ממ"ד, סיד בור, חול בלה/שק, סומסום בלה/שק, בלוק 10/20, לוחות גבס (לבן/ירוק/ורוד 2.60), דבק פלסטומר 603, סיקה 107, גראוט 214, סיקפלקס 11FC, סופר 7.
-- כללי שיבוץ: שקי בלה ובלוקים כבדים דורשים משאית מנוף (חכמת מנוף). לוחות גבס ודבקים ללא פריקת גובה - עלי (משאית רגילה).
-
 הנחיות מענה:
-1. עני תמיד בעברית טבעית, מקצועית, שירותית, ישירה וחמה בסגנון וואטסאפ (עם אימוג'ים מתאימים 🚚🏗️📦).
-2. אם המשתמש שואל על סטטוס הזמנה, פרטי נהג, שעות אספקה או רוצה להזיז שעה - תני תשובה מדויקת לפי רשימת ההזמנות.
-3. אם המשתמש מבקש לשלוח הודעה, דוח בוקר או עדכון לוורד או לנהג - הציעי את נוסח ההודעה המלא והברור וצייני שניתן לשלוח אותה בלחיצה לווביהוק של ורד / JONI.
-4. שמרי על תשובות ברורות ומסודרות.
+1. עני תמיד בעברית טבעית, מקצועית, שירותית, ישירה וחמה בסגנון וואטסאפ (עם אימוג'ים מתאימים 🚚🏗️📦✨).
+2. אם ההודעה מכילה בקשה להזמנה חדשה או נרמול פריטים, פרקי והציגי טבלת/רשימת נרמול מסודרת הכוללת:
+   - מק"ט (SKU)
+   - שם פריט רשמי
+   - כמות ויחידת מידה
+   - שיוך רכב מומלץ (מנוף / רגיל)
+3. אם המשתמש שואל על לו"ז של נהג (חכמת, עלי), שעות, או מבקש להזיז שעה - השיבי במדויק מתוך סידור העבודה.
+4. בסוף הצעת הזמנה או עדכון, צייני שניתן לשדר בלחיצה ישירה ל-Make Webhook של ורד או ל-JONI RTDB.
 `;
+
+    // Local heuristic matching helper
+    const normalizedItems: any[] = [];
+    const lower = message.toLowerCase();
+    CATALOG_PRODUCTS.forEach((p) => {
+      const keys = (p.keywords || '').split(',').map((k) => k.trim().toLowerCase());
+      const matches = keys.some((k) => k && lower.includes(k)) || lower.includes(p.name.toLowerCase()) || lower.includes(p.sku);
+      if (matches) {
+        // extract quantity if found nearby
+        let qty = 1;
+        const regex = new RegExp(`(\\d+)\\s*(?:שק|יח|בלה|לוח|סט|שפופרת|קופסא)?\\s*(?:של)?\\s*${p.name.split(' ')[0]}`, 'i');
+        const m = message.match(regex);
+        if (m && m[1]) {
+          qty = parseInt(m[1], 10);
+        }
+        normalizedItems.push({
+          sku: p.sku,
+          name: p.name,
+          quantity: qty,
+          unit: p.unit,
+          defaultDriver: p.defaultDriver,
+        });
+      }
+    });
 
     const ai = getAIClient();
     if (!ai) {
-      // Fallback rule-based smart response if GEMINI_API_KEY is not set
-      let fallbackText = `היי! אני כאן לעזור בניהול סידור העבודה. יש לנו כרגע ${ordersStore.length} הזמנות פעילות בסידור.`;
-      if (message.includes('בוקר') || message.includes('דוח')) {
-        fallbackText = `בוקר טוב! ☀️ הנה תקציר סידור העבודה להיום:\nסה"כ ${ordersStore.length} הזמנות. מתוכן ${ordersStore.filter((o) => o.status === 'pending').length} בסידור וטרם יצאו לחלוקה. חכמת יוצא לסיבוב מנוף ראשון בהרצליה ב-07:30 ועלי בהוד השרון ב-09:00.`;
+      // Fallback rule-based smart response
+      let fallbackText = `היי! קיבלתי את פנייתך. יש לנו כרגע ${ordersStore.length} הזמנות פעילות בסידור העבודה.`;
+      
+      if (normalizedItems.length > 0) {
+        const isCrane = normalizedItems.some((i) => i.unit === 'בלה' || i.name.includes('בלוק'));
+        fallbackText = `📦 *זיהיתי ונירמלתי ${normalizedItems.length} פריטים לפי המילון הלוגיסטי:*\n\n` +
+          normalizedItems.map((it, idx) => `${idx + 1}. *[${it.sku}]* ${it.name} — כמות: ${it.quantity} ${it.unit}`).join('\n') +
+          `\n\n🚛 *שיוך רכב מומלץ:* ${isCrane ? 'חכמת (משאית מנוף - פריקת שקים כבדים/בלה)' : 'עלי (משאית רגילה)'}\n` +
+          `\nהאם תרצה שאפתח כרטיס הזמנה בסידור או אשדר לוורד בוואטסאפ?`;
+      } else if (message.includes('בוקר') || message.includes('דוח')) {
+        fallbackText = `בוקר טוב! ☀️ הנה תקציר סידור העבודה להיום:\nסה"כ ${ordersStore.length} הזמנות. חכמת יוצא בהרצליה ב-07:30 ועלי בהוד השרון ב-09:00.`;
       } else if (message.includes('חכמת') || message.includes('מנוף')) {
         const craneOrders = ordersStore.filter((o) => o.craneRequired || o.driver.includes('מנוף'));
         fallbackText = `לחכמת (מנוף) משובצות כרגע ${craneOrders.length} הזמנות:\n` + craneOrders.map((o) => `• ${o.orderNumber} - ${o.customerName} (${o.destination}) בשעה ${o.deliveryTime}`).join('\n');
@@ -289,15 +337,17 @@ ${ordersSummaryText}
         const aliOrders = ordersStore.filter((o) => o.driver.includes('עלי'));
         fallbackText = `לעלי משובצות כרגע ${aliOrders.length} הזמנות:\n` + aliOrders.map((o) => `• ${o.orderNumber} - ${o.customerName} (${o.destination}) בשעה ${o.deliveryTime}`).join('\n');
       }
+
       return res.json({
         success: true,
         reply: fallbackText,
         sender: 'noa',
+        normalizedItems: normalizedItems.length > 0 ? normalizedItems : undefined,
         timestamp: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
       });
     }
 
-    const conversationPrompt = `הודעת המשתמש: "${message}"\nאנא השב בתור נועה AI.`;
+    const conversationPrompt = `הודעת המשתמש: "${message}"\nאנא השב בתור נועה AI (מנהלת סידור ולוגיסטיקה). אם יש מוצרים, נרמלי אותם לפי המילון הלוגיסטי.`;
 
     const aiResponse = await ai.models.generateContent({
       model: 'gemini-3.7-flash',
@@ -314,6 +364,7 @@ ${ordersSummaryText}
       success: true,
       reply,
       sender: 'noa',
+      normalizedItems: normalizedItems.length > 0 ? normalizedItems : undefined,
       timestamp: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
     });
   } catch (error) {

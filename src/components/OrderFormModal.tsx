@@ -321,9 +321,9 @@ export const OrderFormModal: React.FC<OrderFormModalProps> = ({
                             (p.keywords && p.keywords.toLowerCase().includes(item.name.toLowerCase()))
                         )
                           .slice(0, 8)
-                          .map((catItem) => (
+                          .map((catItem, catIdx) => (
                             <button
-                              key={catItem.sku}
+                              key={`${catItem.sku}-${catIdx}`}
                               type="button"
                               onClick={() => handleSelectCatalogItem(idx, catItem)}
                               className="w-full text-right p-2 rounded-lg hover:bg-white/[0.06] text-[11px] flex items-center justify-between text-slate-200"

@@ -20,14 +20,19 @@ import { ChatMessage, OrderItem, CONFIG } from '../types';
 interface NoaChatRoomProps {
   orders: OrderItem[];
   onSendToWebhook: (message: string, target?: 'make' | 'joni') => void;
+  onAddNormalizedOrder?: (items: any[], rawText: string) => void;
 }
 
-export const NoaChatRoom: React.FC<NoaChatRoomProps> = ({ orders, onSendToWebhook }) => {
+export const NoaChatRoom: React.FC<NoaChatRoomProps> = ({
+  orders,
+  onSendToWebhook,
+  onAddNormalizedOrder,
+}) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'msg-1',
       sender: 'noa',
-      text: 'שלום! אני נועה, מנהלת הסידור והשילוח שלכם. 🚛✨\nאיך אפשר לעזור היום? אני יכולה לעדכן על מצב הנהגים (חכמת במנוף ועלי), להזיז שעות בסידור, או לייצר עבורך דוח בוקר וסיכום יומי לוורד ולצוות.',
+      text: 'שלום! אני נועה, מנהלת הסידור, השילוח ונרמול ההזמנות שלכם. 🚛✨\nאיך אפשר לעזור היום? אני יכולה לנרמל הזמנות בטקסט חופשי לפי "מילון לוגיסטי", לעדכן על מצב הנהגים (חכמת במנוף ועלי), להזיז שעות בסידור, או לייצר עבורך דוח בוקר וסיכום יומי לוורד ולצוות.',
       timestamp: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
       status: 'read',
     },
@@ -75,6 +80,8 @@ export const NoaChatRoom: React.FC<NoaChatRoomProps> = ({ orders, onSendToWebhoo
         text: data.reply || 'קיבלתי את ההודעה.',
         timestamp: data.timestamp || new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
         status: 'read',
+        normalizedItems: data.normalizedItems,
+        rawText: query,
       };
 
       setMessages((prev) => [...prev, noaMsg]);
@@ -101,6 +108,7 @@ export const NoaChatRoom: React.FC<NoaChatRoomProps> = ({ orders, onSendToWebhoo
   };
 
   const quickPills = [
+    '📦 תביא לי 20 מלט ו-3 בלות חול להרצליה',
     '🌅 הפק דוח בוקר לסידור העבודה',
     '🚛 מה הלו״ז של חכמת (מנוף)?',
     '📦 אילו הזמנות משובצות לעלי?',
@@ -188,6 +196,38 @@ export const NoaChatRoom: React.FC<NoaChatRoomProps> = ({ orders, onSendToWebhoo
                 )}
 
                 <div className="text-slate-100">{msg.text}</div>
+
+                {/* Normalized Items Card if present */}
+                {msg.normalizedItems && msg.normalizedItems.length > 0 && (
+                  <div className="mt-3 p-3 rounded-xl bg-black/40 border border-emerald-500/30 text-xs space-y-2">
+                    <div className="flex items-center justify-between text-emerald-400 font-bold border-b border-white/10 pb-1.5">
+                      <span className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>נרמול מילון לוגיסטי ({msg.normalizedItems.length} פריטים)</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400">SKU זוהה</span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      {msg.normalizedItems.map((item, i) => (
+                        <div key={i} className="flex items-center justify-between text-slate-200 text-[11px]">
+                          <span className="font-mono text-cyan-300">[{item.sku}] {item.name}</span>
+                          <span className="font-bold text-emerald-300">{item.quantity} {item.unit}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {onAddNormalizedOrder && (
+                      <button
+                        onClick={() => onAddNormalizedOrder(msg.normalizedItems || [], msg.rawText || '')}
+                        className="w-full mt-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950/60 transition active:scale-95"
+                      >
+                        <Truck className="w-3.5 h-3.5" />
+                        <span>הזן ישירות כהזמנה חדשה בסידור</span>
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 {/* WhatsApp Timestamp and Blue Ticks */}
                 <div className="flex items-center justify-end gap-1 mt-1.5 text-[10px] text-slate-400 select-none">
