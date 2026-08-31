@@ -53,62 +53,110 @@ export function extractCityFromDestination(destination: string, fallbackCity = '
   return fallbackCity;
 }
 
-export function calculateOrderMetrics(items: OrderProduct[]) {
+export interface OrderMetricsResult {
+  totalWeightKg: number;
+  totalWeightTons: number;
+  hasCraneItem: boolean;
+  warehouse: string;
+  recommendedDriver: string;
+  recommendedTruckType: string;
+  depositDetails: string;
+  depositBigBags: number;
+  depositPallets: number;
+  depositSabanPallets: number;
+  depositBlockPallets: number;
+  isOverloaded: boolean;
+  overloadAlert?: string;
+  depositBreakdown: {
+    bigBags60002: number;
+    sabanPallets60060: number;
+    blockPallets60006: number;
+    isExempt: boolean;
+  };
+}
+
+export function calculateOrderMetrics(items: OrderProduct[]): OrderMetricsResult {
   let totalWeightKg = 0;
   let hasCraneItem = false;
   let warehouseVoteHarash = 0;
   let warehouseVoteTalmid = 0;
-  const deposits: string[] = [];
 
-  let bagCount = 0;
-  let bigBagCount = 0;
-  let blockPalletCount = 0;
+  // Deposit counters according to SabanOS iron rules
+  let bigBagCount60002 = 0;
+  let cementAndMortarBags = 0;
+  let smallQuarryBags = 0;
+  let blockPalletCount60006 = 0;
+  let hasDepositExemptDeliveryCode = false;
 
   items.forEach((item) => {
-    const matched拼 = item.sku ? productMap.get(item.sku) : undefined;
+    const matched = item.sku ? productMap.get(item.sku) : undefined;
     const qty = Number(item.quantity) || 1;
+    const sku = item.sku || '';
+    const name = item.name.toLowerCase();
+    const unit = (item.unit || '').toLowerCase();
 
-    // Weight calculation
-    if (matched拼 && matched拼.weightKg) {
-      totalWeightKg += matched拼.weightKg * qty;
+    // Check delivery codes exempt from deposits (818050 - 818095)
+    if (sku.startsWith('8180') || name.includes('הובלה ללא פריקה') || name.includes('דמי הובלה')) {
+      hasDepositExemptDeliveryCode = true;
+    }
+
+    // --- 1. WEIGHT CALCULATION ---
+    if (matched && matched.weightKg) {
+      totalWeightKg += matched.weightKg * qty;
     } else {
-      // Heuristic fallback weights
-      const name = item.name.toLowerCase();
-      if (name.includes('בלה') || item.unit.includes('בלה') || item.unit.includes('שק גד')) {
-        totalWeightKg += 1200 * qty;
-      } else if (name.includes('מלט') || name.includes('טיט') || name.includes('דבק') || item.unit === 'שק') {
-        totalWeightKg += 25 * qty;
-      } else if (name.includes('גבס') || item.unit === 'לוח') {
+      // Heuristic weight defaults
+      if (name.includes('בלה') || unit.includes('בלה') || unit.includes('שק גד')) {
+        totalWeightKg += 1000 * qty; // 1,000 kg (1 ton) per Big Bag
+      } else if (name.includes('מלט') || name.includes('טיט') || name.includes('דבק') || name.includes('טיח') || unit === 'שק') {
+        totalWeightKg += 25 * qty; // 25 kg standard bag
+      } else if (name.includes('גבס') || unit === 'לוח') {
         totalWeightKg += 24 * qty;
+      } else if (name.includes('בלוק 20')) {
+        totalWeightKg += 18 * qty;
+      } else if (name.includes('בלוק 15')) {
+        totalWeightKg += 14 * qty;
+      } else if (name.includes('בלוק 10')) {
+        totalWeightKg += 10 * qty;
       } else if (name.includes('בלוק')) {
-        totalWeightKg += 1150 * qty;
+        totalWeightKg += 16 * qty;
       } else {
         totalWeightKg += 2 * qty;
       }
     }
 
-    // Crane requirement check (Quarry materials, big bags, blocks, high weight items)
-    const isHeavyQuarryOrCrane =
-      (matched拼 && (matched拼.unit === 'בלה' || matched拼.unit === 'שק גד' || matched拼.name.includes('בלה') || (matched拼.weightKg && matched拼.weightKg > 100))) ||
-      item.unit === 'בלה' ||
-      item.unit === 'שק גד' ||
-      item.name.includes('בלה') ||
-      item.name.includes('חול') ||
-      item.name.includes('סומסום') ||
-      item.name.includes('טיט') ||
-      item.name.includes('בלוק');
+    // --- 2. CRANE / HEAVY FREIGHT DETECTION ---
+    const isBigBagOrQuarry =
+      sku === '11501' || // חול מחצבה שק גדול
+      sku === '11511' || // סומסום שק גדול
+      sku === '11551' || // טיט מוכן שק גדול
+      sku === '11506' || // חצץ שק גדול
+      sku === '11570' || // חמרה שק גדול
+      sku === '11540' || // מצע שק גדול
+      unit === 'בלה' ||
+      unit === 'שק גד' ||
+      name.includes('בלה') ||
+      name.includes('שק גדול') ||
+      name.includes('חול') ||
+      name.includes('סומסום') ||
+      name.includes('טיט') ||
+      name.includes('חצץ') ||
+      name.includes('בלוק') ||
+      name.includes('מנוף') ||
+      name.includes('הנפה');
 
-    if (isHeavyQuarryOrCrane) {
+    if (isBigBagOrQuarry || (matched && matched.weightKg && matched.weightKg >= 100)) {
       hasCraneItem = true;
     }
 
-    // Warehouse assignment
-    // Harash (4) -> Heavy quarry materials, big bags, cement, blocks
-    // Talmid (1) -> Gypsum boards (white/green/blue), metal profiles, paints, adhesives, light equipment
-    const wh = matched拼?.warehouse || '';
-    const name = item.name.toLowerCase();
-    if (
+    // --- 3. ORIGIN WAREHOUSE ASSIGNMENT ---
+    // Warehouse 4 (החרש): Aggregates, cement, thermal plaster, blocks, curbs, crane freight
+    // Warehouse 1 (התלמיד): Gypsum boards, metal profiles, paints, adhesives, screws, doors, finishing tools
+    const wh = matched?.warehouse || '';
+    const isLightOrGypsum =
       wh.includes('התלמיד') ||
+      sku.startsWith('20') || // Gypsum
+      sku.startsWith('21') || // Metal studs / tracks
+      sku.startsWith('30') || // Paints / sealants
       name.includes('גבס') ||
       name.includes('פרופיל') ||
       name.includes('ניצב') ||
@@ -116,50 +164,125 @@ export function calculateOrderMetrics(items: OrderProduct[]) {
       name.includes('צבע') ||
       name.includes('סופר 7') ||
       name.includes('שפכטל') ||
-      name.includes('להב')
-    ) {
+      name.includes('סיליקון') ||
+      name.includes('סרט שריון') ||
+      name.includes('בורג') ||
+      name.includes('ברגי') ||
+      name.includes('דיבל') ||
+      name.includes('דלת') ||
+      name.includes('ידית');
+
+    if (isLightOrGypsum && !isBigBagOrQuarry) {
       warehouseVoteTalmid += qty;
     } else {
       warehouseVoteHarash += qty;
     }
 
-    // Deposits tracking
-    if (item.unit === 'בלה' || item.unit === 'שק גד' || item.name.includes('בלה') || item.name.includes('חול') || item.name.includes('סומסום')) {
-      bigBagCount += qty;
-    } else if (item.unit === 'שק' || item.name.includes('מלט') || item.name.includes('טיט') || item.name.includes('דבק')) {
-      bagCount += qty;
-    } else if (item.name.includes('בלוק')) {
-      blockPalletCount += qty;
+    // --- 4. DEPOSIT ENFORCEMENT ENGINE ---
+    // A. Big Bags Deposit (60002): Mandatory 1:1 on bulk big-bags
+    if (
+      sku === '11501' ||
+      sku === '11511' ||
+      sku === '11551' ||
+      sku === '11506' ||
+      sku === '11570' ||
+      sku === '11540' ||
+      sku === '60002' ||
+      unit === 'בלה' ||
+      unit === 'שק גד' ||
+      name.includes('בלה') ||
+      name.includes('שק גדול')
+    ) {
+      bigBagCount60002 += qty;
+    }
+
+    // B. Cement & Dry Mortar bags for Saban Wooden Pallet (60060)
+    else if (
+      sku === '10002' || // מלט אפור 25 ק"ג נשר
+      sku === '10001' || // מלט לבן 25 ק"ג
+      sku === '14400' || // טיח תרמי 25 ק"ג
+      sku === '15116' || // טיט יבש 25 ק"ג
+      sku === '15181' || // דבק קרמיקה 25 ק"ג
+      name.includes('מלט') ||
+      name.includes('טיח') ||
+      name.includes('דבק קרמיקה') ||
+      name.includes('רובה')
+    ) {
+      cementAndMortarBags += qty;
+    }
+
+    // C. Small Quarry Bags (25 kg sand/gravel): 1 pallet per 50 bags
+    else if (
+      sku === '11001' || // חול ים 25 ק"ג
+      sku === '11011' || // סומסום 25 ק"ג
+      sku === '11006' || // חצץ 25 ק"ג
+      (unit === 'שק' && (name.includes('חול') || name.includes('סומסום') || name.includes('חצץ')))
+    ) {
+      smallQuarryBags += qty;
+    }
+
+    // D. Block Pallet Deposit (60006):
+    else if (sku === '12204' || name.includes('בלוק 20')) {
+      blockPalletCount60006 += Math.ceil(qty / 75);
+    } else if (sku === '12154' || name.includes('בלוק 15')) {
+      blockPalletCount60006 += Math.ceil(qty / 100);
+    } else if (sku === '12010' || name.includes('בלוק 10')) {
+      blockPalletCount60006 += Math.ceil(qty / 150);
+    } else if (name.includes('בלוק')) {
+      blockPalletCount60006 += Math.ceil(qty / 80);
     }
   });
 
-  let palletsCount足 = 0;
-  if (bagCount >= 30) {
-    palletsCount足 += Math.ceil(bagCount / 40);
-  } else if (bagCount >= 10) {
-    palletsCount足 += 1;
-  }
-  palletsCount足 += blockPalletCount;
-
-  if (bigBagCount > 0) {
-    deposits.push(`${bigBagCount} שקי בלה (60002)`);
-  }
-  if (palletsCount足 > 0) {
-    deposits.push(`${palletsCount足} משטחי פקדון (סבן/בלוקים)`);
+  // Calculate Saban Pallets (60060)
+  let sabanPallets60060 = 0;
+  if (cementAndMortarBags >= 20 && cementAndMortarBags <= 40) {
+    sabanPallets60060 += 1;
+  } else if (cementAndMortarBags > 40) {
+    sabanPallets60060 += Math.ceil(cementAndMortarBags / 40);
   }
 
-  // Automatic Smart Dispatch by Noa AI:
-  // 1. Heavy items / quarry / crane required -> Hachmat (Mercedes Crane 615-41-002) & Warehouse 4 (Harash)
-  // 2. Gypsum systems / metal profiles / light items -> Ali (Standard Flatbed Truck) & Warehouse 1 (Talmid)
+  if (smallQuarryBags > 0) {
+    sabanPallets60060 += Math.ceil(smallQuarryBags / 50);
+  }
+
+  // Check Exemption Rule
+  const isAllExempt =
+    hasDepositExemptDeliveryCode ||
+    (bigBagCount60002 === 0 && sabanPallets60060 === 0 && blockPalletCount60006 === 0);
+
+  const finalBigBags = isAllExempt && hasDepositExemptDeliveryCode ? 0 : bigBagCount60002;
+  const finalSabanPallets = isAllExempt && hasDepositExemptDeliveryCode ? 0 : sabanPallets60060;
+  const finalBlockPallets = isAllExempt && hasDepositExemptDeliveryCode ? 0 : blockPalletCount60006;
+  const totalPallets = finalSabanPallets + finalBlockPallets;
+
+  // Build deposit text
+  const depositParts: string[] = [];
+  if (finalBigBags > 0) {
+    depositParts.push(`${finalBigBags} שק בלה (מק"ט 60002)`);
+  }
+  if (finalSabanPallets > 0) {
+    depositParts.push(`${finalSabanPallets} משטח עץ סבן (מק"ט 60060)`);
+  }
+  if (finalBlockPallets > 0) {
+    depositParts.push(`${finalBlockPallets} משטח בלוקים (מק"ט 60006)`);
+  }
+
+  const depositDetails = depositParts.length > 0 ? depositParts.join(' + ') : 'ללא פקדון (פטור)';
+
+  // --- 5. SMART DISPATCH MAPPING ---
   const isCraneDispatch = hasCraneItem || totalWeightKg >= 1500 || warehouseVoteHarash > warehouseVoteTalmid;
   const primaryWarehouse = isCraneDispatch ? '🏭 4️⃣(החרש)' : '🏟️ 1️⃣(התלמיד)';
   const recommendedDriver = isCraneDispatch ? 'חכמת (מנוף)' : 'עלי (משאית רגילה)';
-  const recommendedTruckType剩 = isCraneDispatch
+  const recommendedTruckType = isCraneDispatch
     ? 'משאית מרצדס מנוף (615-41-002)'
-    : 'משאית רגילה פתוחה (משאית עלי)';
+    : 'משאית רגילה / פתוחה (משאית עלי)';
 
-  const depositDetails = deposits.length > 0 ? deposits.join(' + ') : 'ללא פקדון';
+  // --- 6. WEIGHT & OVERLOAD COMPLIANCE ---
   const totalWeightTons = Number((totalWeightKg / 1000).toFixed(2));
+  const isOverloaded = totalWeightKg > 15000;
+  const overloadAlert = isOverloaded
+    ? '⚠️ חריגת משקל: נדרש פיצול המשלוח לשני סבבים'
+    : undefined;
 
   return {
     totalWeightKg: Math.round(totalWeightKg),
@@ -167,10 +290,20 @@ export function calculateOrderMetrics(items: OrderProduct[]) {
     hasCraneItem: isCraneDispatch,
     warehouse: primaryWarehouse,
     recommendedDriver,
-    recommendedTruckType: recommendedTruckType剩,
+    recommendedTruckType,
     depositDetails,
-    depositBigBags: bigBagCount,
-    depositPallets: palletsCount足,
+    depositBigBags: finalBigBags,
+    depositPallets: totalPallets,
+    depositSabanPallets: finalSabanPallets,
+    depositBlockPallets: finalBlockPallets,
+    isOverloaded,
+    overloadAlert,
+    depositBreakdown: {
+      bigBags60002: finalBigBags,
+      sabanPallets60060: finalSabanPallets,
+      blockPallets60006: finalBlockPallets,
+      isExempt: isAllExempt,
+    },
   };
 }
 

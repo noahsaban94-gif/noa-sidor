@@ -562,72 +562,122 @@ export const NoaChatRoom: React.FC<NoaChatRoomProps> = ({
                 )}
 
                 {/* Normalized Items Card if present */}
-                {msg.normalizedItems && msg.normalizedItems.length > 0 && (
-                  <div className="mt-3 p-3.5 rounded-2xl bg-black/60 border border-emerald-500/40 text-xs space-y-3">
-                    <div className="flex items-center justify-between text-emerald-400 font-bold border-b border-white/10 pb-1.5">
-                      <span className="flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>נרמול מילון לוגיסטי ({msg.normalizedItems.length} פריטים שפוענחו מקומקס)</span>
-                      </span>
-                      <span className="text-[10px] text-cyan-300 font-mono">טאב 1 זוהה</span>
-                    </div>
+                {msg.normalizedItems && msg.normalizedItems.length > 0 && (() => {
+                  const previewMetrics = calculateOrderMetrics(
+                    msg.normalizedItems.map((i) => ({
+                      sku: i.sku,
+                      name: i.name || i.officialName || '',
+                      quantity: Number(i.quantity) || 1,
+                      unit: i.unit || 'יח\'',
+                    }))
+                  );
 
-                    <div className="space-y-1.5">
-                      {msg.normalizedItems.map((item, i) => (
-                        <div key={i} className="flex items-center justify-between text-slate-200 text-[11px] bg-white/[0.03] p-2 rounded-xl border border-white/5">
-                          <span className="font-mono text-cyan-300 font-bold">[{item.sku}] {item.name}</span>
-                          <span className="font-bold text-emerald-300">{item.quantity} {item.unit}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Single-Click Instant Injection Button */}
-                    {!injectedOrder ? (
-                      <button
-                        onClick={() => handleDirectInject(msg.id, msg.normalizedItems || [], msg.rawText || '')}
-                        disabled={isInjecting === msg.id}
-                        className="w-full mt-2 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/60 transition active:scale-95 disabled:opacity-50"
-                      >
-                        <Truck className="w-4 h-4" />
-                        <span>
-                          {isInjecting === msg.id
-                            ? 'מזריק כעת לטאב 2 (סידור_עבודה_יומי)...'
-                            : '⚡ אשר והזרק מיידית לסידור עבודה (טאב 2)'}
+                  return (
+                    <div className="mt-3 p-3.5 rounded-2xl bg-black/60 border border-emerald-500/40 text-xs space-y-3 shadow-xl">
+                      <div className="flex items-center justify-between text-emerald-400 font-bold border-b border-white/10 pb-1.5">
+                        <span className="flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>נרמול מילון לוגיסטי ({msg.normalizedItems.length} פריטים שפוענחו מקומקס)</span>
                         </span>
-                      </button>
-                    ) : (
-                      <div className="mt-2 p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/50 space-y-2">
-                        <div className="flex items-center justify-between text-xs font-bold text-emerald-300">
-                          <span className="flex items-center gap-1.5">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                            <span>ההזמנה שובצה בהצלחה בסידור!</span>
-                          </span>
-                          <span className="font-mono text-cyan-300">#{injectedOrder.orderNumber}</span>
-                        </div>
-
-                        <div className="flex items-center gap-2 pt-1">
-                          <a
-                            href={`https://waze.com/ul?q=${encodeURIComponent(injectedOrder.destination)}&navigate=yes`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex-1 py-1.5 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 text-[11px] font-bold flex items-center justify-center gap-1.5 transition"
-                          >
-                            <Navigation className="w-3.5 h-3.5 text-cyan-400" />
-                            <span>נווט ב-Waze</span>
-                          </a>
-
-                          <button
-                            onClick={() => handleSendToWhatsAppWebhook(`🚚 הזמנה #${injectedOrder.orderNumber} שובצה בהצלחה ל${injectedOrder.driver} ביעד ${injectedOrder.destination}`)}
-                            className="flex-1 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold flex items-center justify-center gap-1.5 transition"
-                          >
-                            <Send className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>שדר לוורד</span>
-                          </button>
-                        </div>
+                        <span className="text-[10px] text-cyan-300 font-mono">טאב 1 • מילון לוגיסטי</span>
                       </div>
-                    )}
-                  </div>
-                )}
+
+                      {/* Items List */}
+                      <div className="space-y-1.5">
+                        {msg.normalizedItems.map((item, i) => (
+                          <div key={i} className="flex items-center justify-between text-slate-200 text-[11px] bg-white/[0.03] p-2 rounded-xl border border-white/5">
+                            <span className="font-mono text-cyan-300 font-bold">[{item.sku}] {item.name || item.officialName}</span>
+                            <span className="font-bold text-emerald-300">{item.quantity} {item.unit}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* SabanOS Autonomous Dispatch & Deposit Breakdown Badge */}
+                      <div className="p-2.5 rounded-xl bg-[#0b1324] border border-white/10 space-y-2 text-[11px]">
+                        <div className="grid grid-cols-2 gap-2 text-slate-300">
+                          <div>
+                            <span className="text-slate-400 text-[10px] block">שיבוץ נהג ורכב אוטונומי:</span>
+                            <span className="font-bold text-slate-100 flex items-center gap-1">
+                              <Truck className="w-3.5 h-3.5 text-cyan-400" />
+                              {previewMetrics.recommendedDriver}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block truncate">{previewMetrics.recommendedTruckType}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 text-[10px] block">מחסן יציאה מרכזי:</span>
+                            <span className="font-bold text-emerald-300 flex items-center gap-1">
+                              <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+                              {previewMetrics.warehouse}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block font-mono">משקל: {previewMetrics.totalWeightTons} טון ({previewMetrics.totalWeightKg.toLocaleString()} ק"ג)</span>
+                          </div>
+                        </div>
+
+                        {/* Deposit Breakdown */}
+                        <div className="pt-1.5 border-t border-white/5 flex items-center justify-between flex-wrap gap-1 text-[10px]">
+                          <span className="text-slate-400">אכיפת פקדונות (SabanOS):</span>
+                          <span className="font-bold text-amber-300 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-500/30">
+                            🛡️ {previewMetrics.depositDetails}
+                          </span>
+                        </div>
+
+                        {/* Overload Alert if > 15 tons */}
+                        {previewMetrics.isOverloaded && (
+                          <div className="p-2 rounded-lg bg-rose-950/50 border border-rose-500/50 text-rose-300 font-bold text-[11px] flex items-center gap-1.5">
+                            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                            <span>{previewMetrics.overloadAlert}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Single-Click Instant Injection Button */}
+                      {!injectedOrder ? (
+                        <button
+                          onClick={() => handleDirectInject(msg.id, msg.normalizedItems || [], msg.rawText || '')}
+                          disabled={isInjecting === msg.id}
+                          className="w-full mt-2 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/60 transition active:scale-95 disabled:opacity-50"
+                        >
+                          <Truck className="w-4 h-4" />
+                          <span>
+                            {isInjecting === msg.id
+                              ? 'מזריק כעת לטאב 2 (סידור_עבודה_יומי)...'
+                              : '⚡ אשר והזרק מיידית לסידור עבודה (טאב 2)'}
+                          </span>
+                        </button>
+                      ) : (
+                        <div className="mt-2 p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/50 space-y-2">
+                          <div className="flex items-center justify-between text-xs font-bold text-emerald-300">
+                            <span className="flex items-center gap-1.5">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                              <span>ההזמנה שובצה בהצלחה בסידור!</span>
+                            </span>
+                            <span className="font-mono text-cyan-300">#{injectedOrder.orderNumber}</span>
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-1">
+                            <a
+                              href={`https://waze.com/ul?q=${encodeURIComponent(injectedOrder.destination)}&navigate=yes`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex-1 py-1.5 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 text-[11px] font-bold flex items-center justify-center gap-1.5 transition"
+                            >
+                              <Navigation className="w-3.5 h-3.5 text-cyan-400" />
+                              <span>נווט ב-Waze</span>
+                            </a>
+
+                            <button
+                              onClick={() => handleSendToWhatsAppWebhook(`🚚 הזמנה #${injectedOrder.orderNumber} שובצה בהצלחה ל${injectedOrder.driver} ביעד ${injectedOrder.destination}`)}
+                              className="flex-1 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold flex items-center justify-center gap-1.5 transition"
+                            >
+                              <Share2 className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>שתף בוואטסאפ</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Closing Signature for Noa Messages */}
                 {!isUser && (
